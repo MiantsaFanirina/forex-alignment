@@ -235,7 +235,7 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                   <DialogFooter>
                     <Button
                       variant="outline"
-                      className="w-full mb-2"
+                      className="w-full my-2"
                       onClick={() => {
                         setSearch('');
                         setFilter('all');
