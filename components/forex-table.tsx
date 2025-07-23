@@ -182,7 +182,7 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                   Filters
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-xs w-full p-4">
+              <DialogContent className="max-w-xs w-full p-4" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <DialogHeader>
                   <DialogTitle>Filters</DialogTitle>
                 </DialogHeader>
