@@ -27,8 +27,6 @@ Built with **Next.js**, **TypeScript**, and **Tailwind CSS**, the project focuse
 
 ## 📸 Screenshots
 
-> Showcase your app with real previews. Add multiple screenshots or GIFs here.
-
 <img src="./public/screenshot.png" alt="Forex Dashboard Screenshot" style="width: 100%; border-radius: 8px;" />
 
 ---
