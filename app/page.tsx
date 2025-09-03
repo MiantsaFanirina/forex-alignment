@@ -111,7 +111,6 @@ export default function Home() {
           data={data} 
           onRefresh={handleRefresh} 
           isLoading={isLoading}
-          showWeekly1={true}
         />
 
         {/* Footer */}
