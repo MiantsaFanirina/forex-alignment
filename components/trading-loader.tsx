@@ -24,16 +24,8 @@ export function TradingLoader() {
         transition={{ duration: 0.7, delay: 1.2 }}
         className="text-2xl font-bold text-blue-400 mb-2"
       >
-        Loading Market Data...
+        Loading Market Data
       </motion.h2>
-      <motion.p
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 1.5 }}
-        className="text-blue-300 text-sm"
-      >
-        Please wait while we fetch the latest trading signals and price action.
-      </motion.p>
     </div>
   );
 }
