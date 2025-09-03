@@ -30,6 +30,7 @@ const TIMEFRAME_COLUMNS = [
   { key: 'monthly', label: 'Monthly' },
   { key: 'monthly1', label: 'Monthly-1' },
   { key: 'weekly', label: 'Weekly' },
+  { key: 'weekly1', label: 'Weekly-1' },
   { key: 'daily1', label: 'Daily-1' },
   { key: 'daily', label: 'Daily' },
 ];
@@ -101,6 +102,11 @@ function ForexTableRow({ pair, columns, getCategoryColor, index }: {
       {columns.includes('weekly') && (
         <td className="p-3 text-center">
           <TrendIndicator trend={pair.weekly} />
+        </td>
+      )}
+      {columns.includes('weekly1') && (
+        <td className="p-3 text-center">
+          <TrendIndicator trend={pair.weekly1} />
         </td>
       )}
       {columns.includes('daily1') && (
@@ -276,6 +282,9 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                 )}
                 {columns.includes('weekly') && (
                   <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly</th>
+                )}
+                {columns.includes('weekly1') && (
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly-1</th>
                 )}
                 {columns.includes('daily1') && (
                   <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Daily-1</th>

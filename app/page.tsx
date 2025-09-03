@@ -1,47 +1,53 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ForexPair } from '@/types/forex';
-import { generateInitialForexPairs, updateForexData } from '@/lib/forex-data';
 import { ForexTable } from '@/components/forex-table';
 import { MarketStats } from '@/components/market-stats';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Wifi, WifiOff, Clock, TrendingUp } from 'lucide-react';
+import { TradingLoader } from '@/components/trading-loader';
 
 export default function Home() {
-  const [data, setData] = useState<ForexPair[]>([]);
+  const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  // Initialize data on client side only
+  // Fetch data from API route
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/forex');
+      const json = await res.json();
+      setData(json);
+      setIsConnected(true);
+    } catch {
+      setIsConnected(false);
+    }
+    setIsLoading(false);
+    setInitialLoading(false);
+  };
+
   useEffect(() => {
-    setData(generateInitialForexPairs());
+    fetchData();
   }, []);
 
-  // Simulate real-time updates
   useEffect(() => {
-    if (!autoRefresh || data.length === 0) return;
-
+    if (!autoRefresh || initialLoading) return;
     const interval = setInterval(() => {
-      setData(currentData => updateForexData(currentData));
-    }, 10000); // Update every 10 seconds
-
+      fetchData();
+    }, 10000);
     return () => clearInterval(interval);
-  }, [autoRefresh, data.length]);
+  }, [autoRefresh, initialLoading]);
 
-  const handleRefresh = async () => {
-    setIsLoading(true);
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setData(currentData => updateForexData(currentData));
-    setIsLoading(false);
-  };
+  const handleRefresh = fetchData;
+  const toggleAutoRefresh = () => setAutoRefresh(!autoRefresh);
 
-  const toggleAutoRefresh = () => {
-    setAutoRefresh(!autoRefresh);
-  };
+  if (initialLoading) {
+    return <TradingLoader />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black">
@@ -54,10 +60,7 @@ export default function Home() {
                 <TrendingUp className="h-8 w-8 text-blue-500 md:mr-6 mr-2" />
                 Professional Forex Timeframe Alignment Analysis
               </h1>
-
-
             </div>
-            
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
                 {isConnected ? (
@@ -72,7 +75,6 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              
               <Button
                 onClick={toggleAutoRefresh}
                 variant="outline"
@@ -88,7 +90,6 @@ export default function Home() {
 
         {/* Market Stats */}
         <MarketStats data={data} />
-
         {/* API Integration Notice */}
         <Card className="mb-6 bg-blue-500/10 border-blue-500/20">
           <CardContent className="p-4">
@@ -97,21 +98,20 @@ export default function Home() {
                 <Wifi className="h-4 w-4 text-blue-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-blue-400 mb-1">Ready for API Integration</h3>
+                <h3 className="font-semibold text-blue-400 mb-1">Live Forex & Commodities Data</h3>
                 <p className="text-sm text-blue-300/80">
-                  Ready to integrate with Forex API 
-                  (Alpha Vantage, Twelve Data, or OANDA) for real-time market data.
+                  Live data from market APIs. 
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-
         {/* Main Table */}
         <ForexTable 
           data={data} 
           onRefresh={handleRefresh} 
           isLoading={isLoading}
+          showWeekly1={true}
         />
 
         {/* Footer */}

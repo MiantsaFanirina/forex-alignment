@@ -5,6 +5,7 @@ export interface ForexPair {
   monthly: TrendDirection;
   monthly1: TrendDirection;
   weekly: TrendDirection;
+  weekly1: TrendDirection;
   daily1: TrendDirection;
   daily: TrendDirection;
   alignment: boolean;
