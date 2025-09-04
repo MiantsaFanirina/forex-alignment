@@ -89,35 +89,35 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
     try {
         const url = tradingViewUrlMap[symbol];
         if (!url) return 'neutral';
-        
+
         const res = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             },
             cache: 'no-store'
         });
-        
+
         if (!res.ok) return 'neutral';
-        
+
         const html = await res.text();
-        
+
         // Try multiple patterns to extract price data and determine trend
-        const priceMatch = html.match(/"price":([0-9.]+)/) || 
-                          html.match(/"last":([0-9.]+)/) ||
-                          html.match(/"regularMarketPrice":([0-9.]+)/);
-        
+        const priceMatch = html.match(/"price":([0-9.]+)/) ||
+            html.match(/"last":([0-9.]+)/) ||
+            html.match(/"regularMarketPrice":([0-9.]+)/);
+
         const changeMatch = html.match(/"change":(-?[0-9.]+)/) ||
-                           html.match(/"regularMarketChange":(-?[0-9.]+)/);
-        
+            html.match(/"regularMarketChange":(-?[0-9.]+)/);
+
         if (changeMatch) {
             const change = parseFloat(changeMatch[1]);
             return change > 0 ? 'bullish' : change < 0 ? 'bearish' : 'neutral';
         }
-        
+
         // Fallback: try to find previous day data and compare
         if (priceMatch) {
             const currentPrice = parseFloat(priceMatch[1]);
-            // This is a simplified approach - in a real implementation, 
+            // This is a simplified approach - in a real implementation,
             // you'd want to extract actual historical data
             const prevPriceMatch = html.match(/"previousClose":([0-9.]+)/);
             if (prevPriceMatch) {
@@ -125,7 +125,7 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
                 return currentPrice > prevPrice ? 'bullish' : currentPrice < prevPrice ? 'bearish' : 'neutral';
             }
         }
-        
+
         return 'neutral';
     } catch (err) {
         console.error(`Error fetching TradingView data for ${symbol}:`, err);
@@ -192,6 +192,12 @@ export async function GET() {
             // Trends
             const daily = calculateTrend(opens[lastIdx], closes[lastIdx]);
             let daily1 = calculateTrend(opens[lastIdx - 1], closes[lastIdx - 1]);
+            const weekly = calculateTrend(opens[lastIdx - 4], closes[lastIdx]);
+            const monthly = calculateTrend(opens[monthlyOpenIdx], closes[monthlyCloseIdx]);
+            const monthly1 =
+                monthly1OpenIdx >= 0 && monthly1CloseIdx >= 0
+                    ? calculateTrend(opens[monthly1OpenIdx], closes[monthly1CloseIdx])
+                    : 'neutral';
             
             // If Yahoo Finance daily1 is neutral, try TradingView as fallback
             if (daily1 === 'neutral') {
@@ -203,12 +209,6 @@ export async function GET() {
                 }
             }
             
-            const weekly = calculateTrend(opens[lastIdx - 4], closes[lastIdx]);
-            const monthly = calculateTrend(opens[monthlyOpenIdx], closes[monthlyCloseIdx]);
-            const monthly1 =
-                monthly1OpenIdx >= 0 && monthly1CloseIdx >= 0
-                    ? calculateTrend(opens[monthly1OpenIdx], closes[monthly1CloseIdx])
-                    : 'neutral';
             const trends = [monthly1, monthly, weekly, daily1, daily];
             const alignment = trends.every((t) => t === trends[0]);
 
