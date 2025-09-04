@@ -89,46 +89,86 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
     try {
         const url = tradingViewUrlMap[symbol];
         if (!url) return 'neutral';
-
+        
         const res = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
             },
             cache: 'no-store'
         });
-
+        
         if (!res.ok) return 'neutral';
-
+        
         const html = await res.text();
-
-        // Try multiple patterns to extract price data and determine trend
-        const priceMatch = html.match(/"price":([0-9.]+)/) ||
-            html.match(/"last":([0-9.]+)/) ||
-            html.match(/"regularMarketPrice":([0-9.]+)/);
-
-        const changeMatch = html.match(/"change":(-?[0-9.]+)/) ||
-            html.match(/"regularMarketChange":(-?[0-9.]+)/);
-
-        if (changeMatch) {
-            const change = parseFloat(changeMatch[1]);
-            return change > 0 ? 'bullish' : change < 0 ? 'bearish' : 'neutral';
-        }
-
-        // Fallback: try to find previous day data and compare
-        if (priceMatch) {
-            const currentPrice = parseFloat(priceMatch[1]);
-            // This is a simplified approach - in a real implementation,
-            // you'd want to extract actual historical data
-            const prevPriceMatch = html.match(/"previousClose":([0-9.]+)/);
-            if (prevPriceMatch) {
-                const prevPrice = parseFloat(prevPriceMatch[1]);
-                return currentPrice > prevPrice ? 'bullish' : currentPrice < prevPrice ? 'bearish' : 'neutral';
+        
+        // Try multiple patterns with more variations for different TradingView page structures
+        const changePatterns = [
+            /"change":(-?[0-9.]+)/,
+            /"regularMarketChange":(-?[0-9.]+)/,
+            /"changePercent":(-?[0-9.]+)/,
+            /"changeAbsolute":(-?[0-9.]+)/,
+            /data-field-key="change"[^>]*>([^<]*(-?[0-9.]+))/,
+            /class="[^"]*change[^"]*"[^>]*>([^<]*(-?[0-9.]+))/
+        ];
+        
+        for (const pattern of changePatterns) {
+            const match = html.match(pattern);
+            if (match) {
+                const changeStr = match[1] || match[2];
+                const change = parseFloat(changeStr.replace(/[^-0-9.]/g, ''));
+                if (!isNaN(change)) {
+                    return change > 0 ? 'bullish' : change < 0 ? 'bearish' : 'neutral';
+                }
             }
         }
-
+        
+        // Fallback: try to extract price and previous close
+        const pricePatterns = [
+            /"price":([0-9.]+)/,
+            /"last":([0-9.]+)/,
+            /"regularMarketPrice":([0-9.]+)/,
+            /"currentPrice":([0-9.]+)/,
+            /data-field-key="last_price"[^>]*>([0-9.]+)/
+        ];
+        
+        const prevClosePatterns = [
+            /"previousClose":([0-9.]+)/,
+            /"prevClose":([0-9.]+)/,
+            /"previous_close":([0-9.]+)/,
+            /data-field-key="prev_close"[^>]*>([0-9.]+)/
+        ];
+        
+        let currentPrice = null;
+        let prevPrice = null;
+        
+        for (const pattern of pricePatterns) {
+            const match = html.match(pattern);
+            if (match) {
+                currentPrice = parseFloat(match[1]);
+                break;
+            }
+        }
+        
+        for (const pattern of prevClosePatterns) {
+            const match = html.match(pattern);
+            if (match) {
+                prevPrice = parseFloat(match[1]);
+                break;
+            }
+        }
+        
+        if (currentPrice && prevPrice && !isNaN(currentPrice) && !isNaN(prevPrice)) {
+            return currentPrice > prevPrice ? 'bullish' : currentPrice < prevPrice ? 'bearish' : 'neutral';
+        }
+        
         return 'neutral';
     } catch (err) {
-        console.error(`Error fetching TradingView data for ${symbol}:`, err);
+        // Silent fail in production to avoid console spam
         return 'neutral';
     }
 }
@@ -201,11 +241,9 @@ export async function GET() {
             
             // If Yahoo Finance daily1 is neutral, try TradingView as fallback
             if (daily1 === 'neutral') {
-                console.log(`Daily1 is neutral for ${pair}, trying TradingView fallback...`);
                 const tradingViewTrend = await fetchTradingViewTrend(pair);
                 if (tradingViewTrend !== 'neutral') {
                     daily1 = tradingViewTrend;
-                    console.log(`Using TradingView trend ${tradingViewTrend} for ${pair}`);
                 }
             }
             
