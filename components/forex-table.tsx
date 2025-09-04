@@ -27,10 +27,9 @@ import {
 import { Input } from '@/components/ui/input';
 
 const TIMEFRAME_COLUMNS = [
-  { key: 'monthly', label: 'Monthly' },
   { key: 'monthly1', label: 'Monthly-1' },
+  { key: 'monthly', label: 'Monthly' },
   { key: 'weekly', label: 'Weekly' },
-  { key: 'weekly1', label: 'Weekly-1' },
   { key: 'daily1', label: 'Daily-1' },
   { key: 'daily', label: 'Daily' },
 ];
@@ -64,11 +63,12 @@ function ColumnSelector({ selected, onChange }: { selected: string[]; onChange: 
   );
 }
 
-function ForexTableRow({ pair, columns, getCategoryColor, index }: {
+function ForexTableRow({ pair, columns, getCategoryColor, index, isAligned }: {
   pair: ForexPair;
   columns: string[];
   getCategoryColor: (category: string) => string;
   index: number;
+  isAligned: (pair: ForexPair, columns: string[]) => boolean;
 }) {
   return (
     <tr
@@ -89,24 +89,19 @@ function ForexTableRow({ pair, columns, getCategoryColor, index }: {
           </Badge>
         </div>
       </td>
-      {columns.includes('monthly') && (
-        <td className="p-3 text-center">
-          <TrendIndicator trend={pair.monthly} />
-        </td>
-      )}
       {columns.includes('monthly1') && (
         <td className="p-3 text-center">
           <TrendIndicator trend={pair.monthly1} />
         </td>
       )}
+      {columns.includes('monthly') && (
+        <td className="p-3 text-center">
+          <TrendIndicator trend={pair.monthly} />
+        </td>
+      )}
       {columns.includes('weekly') && (
         <td className="p-3 text-center">
           <TrendIndicator trend={pair.weekly} />
-        </td>
-      )}
-      {columns.includes('weekly1') && (
-        <td className="p-3 text-center">
-          <TrendIndicator trend={pair.weekly1} />
         </td>
       )}
       {columns.includes('daily1') && (
@@ -120,7 +115,7 @@ function ForexTableRow({ pair, columns, getCategoryColor, index }: {
         </td>
       )}
       <td className="p-3 text-center">
-        <AlignmentIndicator isAligned={pair.alignment} />
+        <AlignmentIndicator isAligned={isAligned(pair, columns)} />
       </td>
     </tr>
   );
@@ -162,6 +157,13 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
       case 'commodity': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
+  };
+
+  // Alignment logic based on selected columns
+  const isAligned = (pair: ForexPair, columns: string[]) => {
+    const selectedTrends = columns.map(col => pair[col as keyof ForexPair]);
+    if (selectedTrends.includes('neutral')) return false;
+    return selectedTrends.every(trend => trend === selectedTrends[0]);
   };
 
   const alignedCount = data.filter(pair => pair.alignment).length;
@@ -268,41 +270,45 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left p-3 text-sm font-medium text-gray-300 min-w-[120px]">Pair</th>
-                {columns.includes('monthly') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
-                    <span className="block sm:hidden">M</span>
-                    <span className="hidden sm:block">Monthly</span>
-                  </th>
-                )}
                 {columns.includes('monthly1') && (
                   <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
                     <span className="block sm:hidden">M-1</span>
                     <span className="hidden sm:block">Monthly-1</span>
                   </th>
                 )}
-                {columns.includes('weekly') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly</th>
+                {columns.includes('monthly') && (
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    <span className="block sm:hidden">M</span>
+                    <span className="hidden sm:block">Monthly</span>
+                  </th>
                 )}
-                {columns.includes('weekly1') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly-1</th>
+                {columns.includes('weekly') && (
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    Weekly
+                  </th>
                 )}
                 {columns.includes('daily1') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Daily-1</th>
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    Daily-1
+                  </th>
                 )}
                 {columns.includes('daily') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Daily</th>
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    Daily
+                  </th>
                 )}
                 <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[90px]">Alignment</th>
               </tr>
             </thead>
             <tbody>
-              {filteredData.map((pair, index) => (
+              {filteredData.map((pair, idx) => (
                 <ForexTableRow
                   key={pair.id}
                   pair={pair}
                   columns={columns}
                   getCategoryColor={getCategoryColor}
-                  index={index}
+                  index={idx}
+                  isAligned={isAligned}
                 />
               ))}
             </tbody>
