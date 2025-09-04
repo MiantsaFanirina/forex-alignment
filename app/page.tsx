@@ -19,7 +19,14 @@ export default function Home() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/forex');
+      const res = await fetch('/api/forex', {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const json = await res.json();
       setData(json);
       setIsConnected(true);
