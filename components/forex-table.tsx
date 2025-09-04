@@ -35,10 +35,11 @@ const TIMEFRAME_COLUMNS = [
 ];
 
 function ColumnSelector({ selected, onChange }: { selected: string[]; onChange: (cols: string[]) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800">
+        <Button variant="outline" size="sm" className="text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800" onClick={() => setOpen(true)}>
           Timeframes
         </Button>
       </DropdownMenuTrigger>
@@ -142,10 +143,25 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
     setLastUpdated(new Date());
   }, [data]);
 
+  // Alignment logic based on selected columns
+  const isAligned = (pair: ForexPair, columns: string[]) => {
+    const selectedTrends = columns.map(col => pair[col as keyof ForexPair]);
+    if (selectedTrends.includes('neutral')) return false;
+    return selectedTrends.every(trend => trend === selectedTrends[0]);
+  };
+
   const filteredData = data.filter(pair => {
-    if (filter !== 'all' && filter !== 'aligned' && pair.category !== filter) return false;
-    if (filter === 'aligned' && !pair.alignment) return false;
-    if (search && !pair.pair.toLowerCase().includes(search.toLowerCase())) return false;
+    // If searching, always show all categories
+    if (search) {
+      if (!pair.pair.toLowerCase().includes(search.toLowerCase())) return false;
+      // Set filter to 'all' when searching
+      if (filter !== 'all') setFilter('all');
+    } else {
+      // Category filter
+      if (filter !== 'all' && filter !== 'aligned' && pair.category !== filter) return false;
+    }
+    // Alignment filter (uses selected columns)
+    if (filter === 'aligned' && !isAligned(pair, columns)) return false;
     return true;
   });
 
@@ -157,13 +173,6 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
       case 'commodity': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
-  };
-
-  // Alignment logic based on selected columns
-  const isAligned = (pair: ForexPair, columns: string[]) => {
-    const selectedTrends = columns.map(col => pair[col as keyof ForexPair]);
-    if (selectedTrends.includes('neutral')) return false;
-    return selectedTrends.every(trend => trend === selectedTrends[0]);
   };
 
   const alignedCount = data.filter(pair => pair.alignment).length;
