@@ -89,7 +89,7 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
     try {
         const url = tradingViewUrlMap[symbol];
         if (!url) return 'neutral';
-        
+
         const res = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -101,11 +101,11 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
             },
             cache: 'no-store'
         });
-        
+
         if (!res.ok) return 'neutral';
-        
+
         const html = await res.text();
-        
+
         // Try multiple patterns with more variations for different TradingView page structures
         const changePatterns = [
             /"change":(-?[0-9.]+)/,
@@ -115,7 +115,7 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
             /data-field-key="change"[^>]*>([^<]*(-?[0-9.]+))/,
             /class="[^"]*change[^"]*"[^>]*>([^<]*(-?[0-9.]+))/
         ];
-        
+
         for (const pattern of changePatterns) {
             const match = html.match(pattern);
             if (match) {
@@ -126,7 +126,7 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
                 }
             }
         }
-        
+
         // Fallback: try to extract price and previous close
         const pricePatterns = [
             /"price":([0-9.]+)/,
@@ -135,17 +135,17 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
             /"currentPrice":([0-9.]+)/,
             /data-field-key="last_price"[^>]*>([0-9.]+)/
         ];
-        
+
         const prevClosePatterns = [
             /"previousClose":([0-9.]+)/,
             /"prevClose":([0-9.]+)/,
             /"previous_close":([0-9.]+)/,
             /data-field-key="prev_close"[^>]*>([0-9.]+)/
         ];
-        
+
         let currentPrice = null;
         let prevPrice = null;
-        
+
         for (const pattern of pricePatterns) {
             const match = html.match(pattern);
             if (match) {
@@ -153,7 +153,7 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
                 break;
             }
         }
-        
+
         for (const pattern of prevClosePatterns) {
             const match = html.match(pattern);
             if (match) {
@@ -161,11 +161,11 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
                 break;
             }
         }
-        
+
         if (currentPrice && prevPrice && !isNaN(currentPrice) && !isNaN(prevPrice)) {
             return currentPrice > prevPrice ? 'bullish' : currentPrice < prevPrice ? 'bearish' : 'neutral';
         }
-        
+
         return 'neutral';
     } catch (err) {
         // Silent fail in production to avoid console spam
@@ -238,7 +238,7 @@ export async function GET() {
                 monthly1OpenIdx >= 0 && monthly1CloseIdx >= 0
                     ? calculateTrend(opens[monthly1OpenIdx], closes[monthly1CloseIdx])
                     : 'neutral';
-            
+
             // If Yahoo Finance daily1 is neutral, try TradingView as fallback
             if (daily1 === 'neutral') {
                 const tradingViewTrend = await fetchTradingViewTrend(pair);
@@ -246,7 +246,7 @@ export async function GET() {
                     daily1 = tradingViewTrend;
                 }
             }
-            
+
             const trends = [monthly1, monthly, weekly, daily1, daily];
             const alignment = trends.every((t) => t === trends[0]);
 
