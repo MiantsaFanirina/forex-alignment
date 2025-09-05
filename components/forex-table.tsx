@@ -7,7 +7,10 @@ import { AlignmentIndicator } from './alignment-indicator';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Filter, X } from 'lucide-react';
+import { RefreshCw, Filter, X, Search, Settings, ChevronDown, Loader2, Globe } from 'lucide-react';
+import { TimezoneSelector } from './timezone-selector';
+import { useTimezone } from '@/contexts/timezone-context';
+import { formatInTimezone, getTimezoneAbbreviation } from '@/lib/timezone-utils';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -27,48 +30,89 @@ import {
 import { Input } from '@/components/ui/input';
 
 const TIMEFRAME_COLUMNS = [
-  { key: 'monthly', label: 'Monthly' },
   { key: 'monthly1', label: 'Monthly-1' },
+  { key: 'monthly', label: 'Monthly' },
   { key: 'weekly', label: 'Weekly' },
-  { key: 'weekly1', label: 'Weekly-1' },
   { key: 'daily1', label: 'Daily-1' },
   { key: 'daily', label: 'Daily' },
 ];
 
 function ColumnSelector({ selected, onChange }: { selected: string[]; onChange: (cols: string[]) => void }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800">
-          Timeframes
+    <div className="space-y-2">
+      <div className="text-xs text-gray-400 font-medium mb-3">
+        Select visible timeframes ({selected.length}/{TIMEFRAME_COLUMNS.length} selected)
+      </div>
+      
+      <div className="grid grid-cols-1 gap-2">
+        {TIMEFRAME_COLUMNS.map(col => {
+          const isSelected = selected.includes(col.key);
+          
+          return (
+            <button
+              key={col.key}
+              onClick={() => {
+                if (isSelected) {
+                  onChange(selected.filter(k => k !== col.key));
+                } else {
+                  onChange([...selected, col.key]);
+                }
+              }}
+              className={cn(
+                'flex items-center justify-between p-3 rounded-lg border transition-all duration-200 text-sm',
+                isSelected
+                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
+                  : 'bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                  isSelected
+                    ? 'bg-blue-500 border-blue-500'
+                    : 'border-gray-500'
+                )}>
+                  {isSelected && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{col.label}</span>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                {col.key === 'monthly1' && 'M-1'}
+                {col.key === 'monthly' && 'M'}
+                {col.key === 'weekly' && 'W'}
+                {col.key === 'daily1' && 'D-1'}
+                {col.key === 'daily' && 'D'}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      
+      {selected.length < TIMEFRAME_COLUMNS.length && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange(TIMEFRAME_COLUMNS.map(c => c.key))}
+          className="w-full text-xs border-gray-600 text-gray-400 hover:text-gray-200"
+        >
+          Select All Timeframes
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {TIMEFRAME_COLUMNS.map(col => (
-          <DropdownMenuCheckboxItem
-            key={col.key}
-            checked={selected.includes(col.key)}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                onChange([...selected, col.key]);
-              } else {
-                onChange(selected.filter(k => k !== col.key));
-              }
-            }}
-          >
-            {col.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      )}
+    </div>
   );
 }
 
-function ForexTableRow({ pair, columns, getCategoryColor, index }: {
+function ForexTableRow({ pair, columns, getCategoryColor, index, isAligned }: {
   pair: ForexPair;
   columns: string[];
   getCategoryColor: (category: string) => string;
   index: number;
+  isAligned: (pair: ForexPair, columns: string[]) => boolean;
 }) {
   return (
     <tr
@@ -89,24 +133,19 @@ function ForexTableRow({ pair, columns, getCategoryColor, index }: {
           </Badge>
         </div>
       </td>
-      {columns.includes('monthly') && (
-        <td className="p-3 text-center">
-          <TrendIndicator trend={pair.monthly} />
-        </td>
-      )}
       {columns.includes('monthly1') && (
         <td className="p-3 text-center">
           <TrendIndicator trend={pair.monthly1} />
         </td>
       )}
+      {columns.includes('monthly') && (
+        <td className="p-3 text-center">
+          <TrendIndicator trend={pair.monthly} />
+        </td>
+      )}
       {columns.includes('weekly') && (
         <td className="p-3 text-center">
           <TrendIndicator trend={pair.weekly} />
-        </td>
-      )}
-      {columns.includes('weekly1') && (
-        <td className="p-3 text-center">
-          <TrendIndicator trend={pair.weekly1} />
         </td>
       )}
       {columns.includes('daily1') && (
@@ -120,7 +159,7 @@ function ForexTableRow({ pair, columns, getCategoryColor, index }: {
         </td>
       )}
       <td className="p-3 text-center">
-        <AlignmentIndicator isAligned={pair.alignment} />
+        <AlignmentIndicator isAligned={isAligned(pair, columns)} />
       </td>
     </tr>
   );
@@ -130,9 +169,11 @@ interface ForexTableProps {
   data: ForexPair[];
   onRefresh: () => void;
   isLoading?: boolean;
+  isTimezoneLoading?: boolean;
 }
 
-export function ForexTable({ data, onRefresh, isLoading = false }: ForexTableProps) {
+export function ForexTable({ data, onRefresh, isLoading = false, isTimezoneLoading = false }: ForexTableProps) {
+  const { selectedTimezone, setSelectedTimezone, isClient } = useTimezone();
   const [filter, setFilter] = useState<'all' | 'aligned' | 'major' | 'minor' | 'exotic' | 'commodity'>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [columns, setColumns] = useState<string[]>(TIMEFRAME_COLUMNS.map(c => c.key));
@@ -147,10 +188,27 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
     setLastUpdated(new Date());
   }, [data]);
 
+  // Note: timezone changes are now handled in parent component via client-side processing
+
+  // Alignment logic based on selected columns
+  const isAligned = (pair: ForexPair, columns: string[]) => {
+    const selectedTrends = columns.map(col => pair[col as keyof ForexPair]);
+    if (selectedTrends.includes('neutral')) return false;
+    return selectedTrends.every(trend => trend === selectedTrends[0]);
+  };
+
   const filteredData = data.filter(pair => {
-    if (filter !== 'all' && filter !== 'aligned' && pair.category !== filter) return false;
-    if (filter === 'aligned' && !pair.alignment) return false;
-    if (search && !pair.pair.toLowerCase().includes(search.toLowerCase())) return false;
+    // If searching, always show all categories
+    if (search) {
+      if (!pair.pair.toLowerCase().includes(search.toLowerCase())) return false;
+      // Set filter to 'all' when searching
+      if (filter !== 'all') setFilter('all');
+    } else {
+      // Category filter
+      if (filter !== 'all' && filter !== 'aligned' && pair.category !== filter) return false;
+    }
+    // Alignment filter (uses selected columns)
+    if (filter === 'aligned' && !isAligned(pair, columns)) return false;
     return true;
   });
 
@@ -173,142 +231,285 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
           <div>
             <CardTitle className="text-xl font-bold text-white">FX Map</CardTitle>
             <p className="text-sm text-gray-400 mt-1">
-              Last updated: {lastUpdated?.toLocaleTimeString() || '--:--:--'} • {alignedCount}/{data.length} pairs aligned
+              Last updated: {isClient && lastUpdated ? formatInTimezone(lastUpdated, selectedTimezone, 'HH:mm:ss zzz') : '--:--:--'} • {alignedCount}/{data.length} pairs aligned
             </p>
           </div>
-          {/* Filters Button for all devices */}
-          <div className="flex w-full justify-end">
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full md:max-w-[180px] text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800 "
-                >
-                  Filters
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-xs w-full p-4" onOpenAutoFocus={(e) => e.preventDefault()}>
-                <DialogHeader>
-                  <DialogTitle>Filters</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                  <div className="relative mb-2">
-                    <Input
-                      placeholder="Search pair..."
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      className="pr-8"
-                    />
-                    {search && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 focus:outline-none"
-                        tabIndex={0}
-                        aria-label="Clear search"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <div className="mb-2 text-xs font-semibold text-gray-400">Category</div>
-                    <div className="flex flex-wrap gap-1">
-                      {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => (
-                        <Button
-                          key={filterOption}
-                          variant={filter === filterOption ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setFilter(filterOption)}
-                          className={cn(
-                            'text-xs h-7',
-                            filter === filterOption
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'border-gray-700 text-gray-300 hover:bg-gray-800'
+          {/* Timezone selector and Filters */}
+          <div className="flex flex-col gap-4 sm:gap-2">
+            {/* Mobile: Stack vertically, Desktop: Side by side */}
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-2 items-stretch sm:items-center">
+              {isClient && (
+                <TimezoneSelector 
+                  selectedTimezone={selectedTimezone}
+                  onTimezoneChange={setSelectedTimezone}
+                  className="flex-1 sm:flex-initial"
+                  isMobile={true}
+                  isLoading={isTimezoneLoading}
+                />
+              )}
+              
+              <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-initial sm:min-w-[120px] h-12 sm:h-8 py-3 sm:py-1 text-sm sm:text-xs border-gray-700 text-gray-300 hover:bg-gray-700/50 transition-colors"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    <span>Filters</span>
+                    <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                  </Button>
+                </DialogTrigger>
+              <DialogContent className="sm:max-w-md w-full h-[100vh] sm:h-auto max-h-[100vh] mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
+                <div className="bg-gray-800 border-0 sm:border border-gray-700 h-full sm:h-auto sm:rounded-lg shadow-xl flex flex-col">
+                  <DialogHeader className="px-6 py-4 pt-6 sm:pt-4 border-b border-gray-700 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5 text-blue-400" />
+                      <DialogTitle className="text-lg font-semibold text-white">Filter & Search</DialogTitle>
+                    </div>
+                  </DialogHeader>
+                  
+                  <div className="flex-1 overflow-y-auto min-h-0 max-h-[calc(100vh-200px)] sm:max-h-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="px-6 py-4 pb-8 space-y-6">
+                    {/* Search Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <Search className="h-4 w-4" />
+                        <span>Search Pairs</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          placeholder="Type pair name (e.g., EURUSD)..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          className="pr-10 bg-gray-900/50 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 h-10"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          {search ? (
+                            <button
+                              type="button"
+                              onClick={() => setSearch('')}
+                              className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <Search className="h-4 w-4 text-gray-500" />
                           )}
-                        >
-                          <Filter className="h-3 w-3 mr-1" />
-                          {filterOption === 'all' ? 'All' : filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-                        </Button>
-                      ))}
+                        </div>
+                      </div>
+                      {search && (
+                        <div className="text-xs text-gray-400">
+                          Searching for: <span className="text-white font-medium">{search}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Category Filters */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <Filter className="h-4 w-4" />
+                        <span>Categories</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => {
+                          const getCategoryInfo = (option: string) => {
+                            switch (option) {
+                              case 'all': return { icon: '🌐', label: 'All Pairs' };
+                              case 'aligned': return { icon: '✨', label: 'Aligned' };
+                              case 'major': return { icon: '💎', label: 'Major' };
+                              case 'minor': return { icon: '⭐', label: 'Minor' };
+                              case 'exotic': return { icon: '🔥', label: 'Exotic' };
+                              case 'commodity': return { icon: '🏆', label: 'Commodity' };
+                              default: return { icon: '📊', label: option };
+                            }
+                          };
+                          
+                          const { icon, label } = getCategoryInfo(filterOption);
+                          
+                          return (
+                            <Button
+                              key={filterOption}
+                              variant={filter === filterOption ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setFilter(filterOption)}
+                              className={cn(
+                                'h-12 text-sm transition-all duration-200 flex flex-col items-center justify-center gap-1',
+                                filter === filterOption
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500 shadow-lg transform scale-105'
+                                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                              )}
+                            >
+                              <span className="text-base">{icon}</span>
+                              <span className="text-xs font-medium">{label}</span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Timeframe Selection */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <span>⏰</span>
+                        <span>Timeframes</span>
+                      </div>
+                      <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-600">
+                        <ColumnSelector selected={columns} onChange={setColumns} />
+                      </div>
+                    </div>
+
+                    {/* Filter Summary */}
+                    {(filter !== 'all' || search || columns.length !== TIMEFRAME_COLUMNS.length) && (
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                        <div className="text-sm text-blue-400 font-medium mb-2">Active Filters:</div>
+                        <div className="space-y-1 text-xs text-gray-300">
+                          {filter !== 'all' && (
+                            <div>Category: <span className="text-white font-medium">{filter}</span></div>
+                          )}
+                          {search && (
+                            <div>Search: <span className="text-white font-medium">{search}</span></div>
+                          )}
+                          {columns.length !== TIMEFRAME_COLUMNS.length && (
+                            <div>Timeframes: <span className="text-white font-medium">{columns.length} selected</span></div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     </div>
                   </div>
-                  <div>
-                    <div className="mb-2 text-xs font-semibold text-gray-400">Timeframes</div>
-                    <ColumnSelector selected={columns} onChange={setColumns} />
-                  </div>
-                  <DialogFooter>
+
+                  <DialogFooter className="px-6 py-4 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
                     <Button
                       variant="outline"
-                      className="w-full my-2"
+                      className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50"
                       onClick={() => {
                         setSearch('');
                         setFilter('all');
                         setColumns(TIMEFRAME_COLUMNS.map(c => c.key));
                       }}
                     >
-                      Reset Filters
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reset All
                     </Button>
                     <DialogClose asChild>
-                      <Button variant="default" className="w-full mt-2" onClick={() => setModalOpen(false)}>
-                        Apply
+                      <Button 
+                        variant="default" 
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+                        onClick={() => setModalOpen(false)}
+                      >
+                        Apply Filters
                       </Button>
                     </DialogClose>
                   </DialogFooter>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* Loading State - Completely replaces table content */}
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[400px] sm:min-h-[500px] px-4 py-12">
+            <div className="flex flex-col items-center gap-6 max-w-sm mx-auto text-center">
+              {/* Animated loading spinner */}
+              <div className="relative">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-16 h-16 sm:w-20 sm:h-20 border-4 border-transparent border-r-blue-400 rounded-full animate-spin animation-delay-150"></div>
+              </div>
+              
+              {/* Loading text */}
+              <div className="space-y-3">
+                <div className="text-lg sm:text-xl font-semibold text-white">
+                  {isTimezoneLoading ? 'Switching Timezone' : 'Loading Forex Data'}
+                </div>
+                <div className="text-sm sm:text-base text-gray-400 leading-relaxed">
+                  {isTimezoneLoading 
+                    ? 'Recalculating candlestick boundaries for your selected timezone...'
+                    : 'Fetching live market data and trend analysis...'
+                  }
+                </div>
+              </div>
+              
+              {/* Progress dots animation */}
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse animation-delay-200"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse animation-delay-400"></div>
+              </div>
+              
+              {/* Selected timezone display during timezone loading */}
+              {isTimezoneLoading && (
+                <div className="mt-4 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-400 text-sm">
+                    <Globe className="h-4 w-4" />
+                    <span>Switching to {getTimezoneAbbreviation(selectedTimezone)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Table content - only shown when NOT loading */
+          <div className="overflow-x-auto">
+            <table className="w-full">
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left p-3 text-sm font-medium text-gray-300 min-w-[120px]">Pair</th>
-                {columns.includes('monthly') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
-                    <span className="block sm:hidden">M</span>
-                    <span className="hidden sm:block">Monthly</span>
-                  </th>
-                )}
                 {columns.includes('monthly1') && (
                   <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
                     <span className="block sm:hidden">M-1</span>
                     <span className="hidden sm:block">Monthly-1</span>
                   </th>
                 )}
-                {columns.includes('weekly') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly</th>
+                {columns.includes('monthly') && (
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    <span className="block sm:hidden">M</span>
+                    <span className="hidden sm:block">Monthly</span>
+                  </th>
                 )}
-                {columns.includes('weekly1') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Weekly-1</th>
+                {columns.includes('weekly') && (
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    <span className="block sm:hidden">W</span>
+                    <span className="hidden sm:block">Weekly</span>
+                  </th>
                 )}
                 {columns.includes('daily1') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Daily-1</th>
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    <span className="block sm:hidden">D-1</span>
+                    <span className="hidden sm:block">Daily-1</span>
+                  </th>
                 )}
                 {columns.includes('daily') && (
-                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">Daily</th>
+                  <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[80px]">
+                    <span className="block sm:hidden">D</span>
+                    <span className="hidden sm:block">Daily</span>
+                  </th>
                 )}
                 <th className="text-center p-3 text-sm font-medium text-gray-300 min-w-[90px]">Alignment</th>
               </tr>
             </thead>
             <tbody>
-              {filteredData.map((pair, index) => (
+              {filteredData.map((pair, idx) => (
                 <ForexTableRow
                   key={pair.id}
                   pair={pair}
                   columns={columns}
                   getCategoryColor={getCategoryColor}
-                  index={index}
+                  index={idx}
+                  isAligned={isAligned}
                 />
               ))}
             </tbody>
-          </table>
-        </div>
-        {filteredData.length === 0 && (
+            </table>
+          </div>
+        )}
+        
+        {/* No data message - only shown when NOT loading and no data */}
+        {!isLoading && filteredData.length === 0 && (
           <div className="text-center py-8 text-gray-400">
             No pairs match the current filter
           </div>
