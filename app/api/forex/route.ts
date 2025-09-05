@@ -173,12 +173,43 @@ async function fetchTradingViewTrend(symbol: string): Promise<TrendDirection> {
     }
 }
 
+// Helper function to find the first trading day of the current week (Monday)
+function getStartOfWeek(date: Date): Date {
+    const startOfWeek = new Date(date);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+    return startOfWeek;
+}
+
+// Helper function to get yesterday's date
+function getYesterday(date: Date): Date {
+    const yesterday = new Date(date);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+}
+
+// Helper function to safely get trend with fallback
+async function getTrendWithFallback(pair: string, open: number | null | undefined, close: number | null | undefined, timeframe: string): Promise<TrendDirection> {
+    // If we have valid open and close prices, calculate the trend
+    if (open !== null && open !== undefined && close !== null && close !== undefined && !isNaN(open) && !isNaN(close)) {
+        return calculateTrend(open, close);
+    }
+    
+    // If Yahoo Finance data is invalid, try TradingView as fallback
+    console.log(`Using TradingView fallback for ${pair} ${timeframe} - open: ${open}, close: ${close}`);
+    const tradingViewTrend = await fetchTradingViewTrend(pair);
+    return tradingViewTrend;
+}
+
 export async function GET() {
     const results: ForexPair[] = [];
 
     for (const [pair, symbol] of Object.entries(yahooSymbolMap)) {
         try {
-            const res = await fetch(
+            // Fetch daily data for monthly, weekly calculations
+            const dailyRes = await fetch(
                 `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
                     symbol
                 )}?range=6mo&interval=1d`,
@@ -188,62 +219,234 @@ export async function GET() {
                 }
             );
 
-            if (!res.ok) continue;
-
-            const json = await res.json();
-            const candles = json.chart?.result?.[0]?.indicators?.quote?.[0];
-            const opens = candles?.open;
-            const closes = candles?.close;
-
-            if (!opens || !closes) continue;
-
-            const lastIdx = opens.length - 1;
-            // Find indices for monthly and monthly-1 using calendar months
-            const timestamps = json.chart?.result?.[0]?.timestamp;
-            let monthlyOpenIdx = lastIdx,
-                monthlyCloseIdx = lastIdx;
-            let monthly1OpenIdx = lastIdx,
-                monthly1CloseIdx = lastIdx;
-            if (timestamps && timestamps.length > 0) {
-                const dateObjs: Date[] = (timestamps as number[]).map((ts: number) => new Date(ts * 1000));
-                const currentMonth = dateObjs[lastIdx].getMonth();
-                const currentYear = dateObjs[lastIdx].getFullYear();
-                // Indices for current month
-                const currentMonthIndices = dateObjs
-                    .map((d, i) => ({ d, i }))
-                    .filter(({ d }) => d.getMonth() === currentMonth && d.getFullYear() === currentYear)
-                    .map(({ i }) => i);
-                if (currentMonthIndices.length > 0) {
-                    monthlyOpenIdx = currentMonthIndices[0];
-                    monthlyCloseIdx = currentMonthIndices[currentMonthIndices.length - 1];
+            // Fetch hourly data for daily and daily-1 calculations
+            const hourlyRes = await fetch(
+                `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+                    symbol
+                )}?range=7d&interval=1h`,
+                {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    cache: 'no-store',
                 }
-                // Indices for previous month
-                const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-                const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-                const prevMonthIndices = dateObjs
-                    .map((d, i) => ({ d, i }))
-                    .filter(({ d }) => d.getMonth() === prevMonth && d.getFullYear() === prevYear)
-                    .map(({ i }) => i);
-                if (prevMonthIndices.length > 0) {
-                    monthly1OpenIdx = prevMonthIndices[0];
-                    monthly1CloseIdx = prevMonthIndices[prevMonthIndices.length - 1];
+            );
+
+            if (!dailyRes.ok) {
+                console.log(`Daily data fetch failed for ${pair}, using TradingView fallback`);
+                const fallbackTrend = await fetchTradingViewTrend(pair);
+                
+                // Refined category classification
+                let category: ForexPair['category'] = 'major';
+                if (['EURUSD', 'USDJPY', 'GBPUSD', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD'].includes(pair)) {
+                    category = 'major';
+                } else if (
+                    [
+                        'EURGBP', 'EURJPY', 'EURCHF', 'EURCAD', 'EURAUD', 'EURNZD',
+                        'GBPJPY', 'GBPCHF', 'GBPCAD', 'GBPAUD', 'GBPNZD',
+                        'AUDCAD', 'AUDCHF', 'AUDJPY', 'AUDNZD',
+                        'CADCHF', 'CADJPY', 'CHFJPY', 'NZDCAD', 'NZDCHF', 'NZDJPY',
+                    ].includes(pair)
+                ) {
+                    category = 'minor';
+                } else if (['BTCUSD'].includes(pair)) {
+                    category = 'exotic';
+                } else if (['XAUUSD', 'XAGUSD', 'BRENT', 'WTI'].includes(pair)) {
+                    category = 'commodity';
+                } else if (['US100', 'US30'].includes(pair)) {
+                    category = 'exotic';
+                } else {
+                    category = 'exotic';
                 }
+                
+                results.push({
+                    id: symbol,
+                    pair,
+                    category,
+                    daily: fallbackTrend,
+                    daily1: fallbackTrend,
+                    weekly: fallbackTrend,
+                    monthly: fallbackTrend,
+                    monthly1: fallbackTrend,
+                    alignment: true, // All same trend = aligned
+                    lastUpdated: new Date(),
+                });
+                continue;
             }
-            // Trends
-            const daily = calculateTrend(opens[lastIdx], closes[lastIdx]);
-            let daily1 = calculateTrend(opens[lastIdx - 1], closes[lastIdx - 1]);
-            const weekly = calculateTrend(opens[lastIdx - 4], closes[lastIdx]);
-            const monthly = calculateTrend(opens[monthlyOpenIdx], closes[monthlyCloseIdx]);
-            const monthly1 =
-                monthly1OpenIdx >= 0 && monthly1CloseIdx >= 0
-                    ? calculateTrend(opens[monthly1OpenIdx], closes[monthly1CloseIdx])
-                    : 'neutral';
 
-            // If Yahoo Finance daily1 is neutral, try TradingView as fallback
-            if (daily1 === 'neutral') {
-                const tradingViewTrend = await fetchTradingViewTrend(pair);
-                if (tradingViewTrend !== 'neutral') {
-                    daily1 = tradingViewTrend;
+            const dailyJson = await dailyRes.json();
+            const dailyCandles = dailyJson.chart?.result?.[0]?.indicators?.quote?.[0];
+            const dailyOpens = dailyCandles?.open;
+            const dailyCloses = dailyCandles?.close;
+            const dailyTimestamps = dailyJson.chart?.result?.[0]?.timestamp;
+
+            let hourlyOpens: number[] | null = null;
+            let hourlyCloses: number[] | null = null;
+            let hourlyTimestamps: number[] | null = null;
+
+            if (hourlyRes.ok) {
+                const hourlyJson = await hourlyRes.json();
+                const hourlyCandles = hourlyJson.chart?.result?.[0]?.indicators?.quote?.[0];
+                hourlyOpens = hourlyCandles?.open;
+                hourlyCloses = hourlyCandles?.close;
+                hourlyTimestamps = hourlyJson.chart?.result?.[0]?.timestamp;
+            }
+
+            if (!dailyOpens || !dailyCloses || !dailyTimestamps) {
+                console.log(`Invalid daily data for ${pair}, using TradingView fallback`);
+                const fallbackTrend = await fetchTradingViewTrend(pair);
+                
+                // Refined category classification
+                let category: ForexPair['category'] = 'major';
+                if (['EURUSD', 'USDJPY', 'GBPUSD', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD'].includes(pair)) {
+                    category = 'major';
+                } else if (
+                    [
+                        'EURGBP', 'EURJPY', 'EURCHF', 'EURCAD', 'EURAUD', 'EURNZD',
+                        'GBPJPY', 'GBPCHF', 'GBPCAD', 'GBPAUD', 'GBPNZD',
+                        'AUDCAD', 'AUDCHF', 'AUDJPY', 'AUDNZD',
+                        'CADCHF', 'CADJPY', 'CHFJPY', 'NZDCAD', 'NZDCHF', 'NZDJPY',
+                    ].includes(pair)
+                ) {
+                    category = 'minor';
+                } else if (['BTCUSD'].includes(pair)) {
+                    category = 'exotic';
+                } else if (['XAUUSD', 'XAGUSD', 'BRENT', 'WTI'].includes(pair)) {
+                    category = 'commodity';
+                } else if (['US100', 'US30'].includes(pair)) {
+                    category = 'exotic';
+                } else {
+                    category = 'exotic';
+                }
+                
+                results.push({
+                    id: symbol,
+                    pair,
+                    category,
+                    daily: fallbackTrend,
+                    daily1: fallbackTrend,
+                    weekly: fallbackTrend,
+                    monthly: fallbackTrend,
+                    monthly1: fallbackTrend,
+                    alignment: true,
+                    lastUpdated: new Date(),
+                });
+                continue;
+            }
+
+            const lastDailyIdx = dailyOpens.length - 1;
+            const now = new Date();
+            const dateObjs: Date[] = (dailyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
+            
+            // MONTHLY-1 CALCULATION
+            // First open price of the last month compared to the last close price of the last month
+            let monthly1: TrendDirection = 'neutral';
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+            const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+            
+            const prevMonthIndices = dateObjs
+                .map((d, i) => ({ d, i }))
+                .filter(({ d }) => d.getMonth() === prevMonth && d.getFullYear() === prevYear)
+                .map(({ i }) => i);
+            
+            if (prevMonthIndices.length > 0) {
+                const monthly1OpenIdx = prevMonthIndices[0];
+                const monthly1CloseIdx = prevMonthIndices[prevMonthIndices.length - 1];
+                monthly1 = await getTrendWithFallback(pair, dailyOpens[monthly1OpenIdx], dailyCloses[monthly1CloseIdx], 'monthly-1');
+            } else {
+                monthly1 = await getTrendWithFallback(pair, null, null, 'monthly-1');
+            }
+
+            // MONTHLY CALCULATION 
+            // First open price of the current month compared to the last close price of today
+            let monthly: TrendDirection = 'neutral';
+            const currentMonthIndices = dateObjs
+                .map((d, i) => ({ d, i }))
+                .filter(({ d }) => d.getMonth() === currentMonth && d.getFullYear() === currentYear)
+                .map(({ i }) => i);
+            
+            if (currentMonthIndices.length > 0) {
+                const monthlyOpenIdx = currentMonthIndices[0];
+                monthly = await getTrendWithFallback(pair, dailyOpens[monthlyOpenIdx], dailyCloses[lastDailyIdx], 'monthly');
+            } else {
+                monthly = await getTrendWithFallback(pair, null, null, 'monthly');
+            }
+
+            // WEEKLY CALCULATION
+            // First open price of the first day of the current week compared to the last close price of today
+            let weekly: TrendDirection = 'neutral';
+            const startOfWeek = getStartOfWeek(now);
+            const weeklyIndices = dateObjs
+                .map((d, i) => ({ d, i }))
+                .filter(({ d }) => d >= startOfWeek)
+                .map(({ i }) => i);
+            
+            if (weeklyIndices.length > 0) {
+                const weeklyOpenIdx = weeklyIndices[0];
+                weekly = await getTrendWithFallback(pair, dailyOpens[weeklyOpenIdx], dailyCloses[lastDailyIdx], 'weekly');
+            } else {
+                // If no data for current week, try using last few trading days as fallback
+                const fallbackWeeklyOpenIdx = Math.max(0, lastDailyIdx - 4);
+                weekly = await getTrendWithFallback(pair, dailyOpens[fallbackWeeklyOpenIdx], dailyCloses[lastDailyIdx], 'weekly');
+            }
+
+            // DAILY CALCULATION
+            // First open price of today compared to current last close price of today
+            let daily: TrendDirection = 'neutral';
+            if (hourlyOpens && hourlyCloses && hourlyTimestamps) {
+                const hourlyDateObjs: Date[] = (hourlyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const todayIndices = hourlyDateObjs
+                    .map((d, i) => ({ d, i }))
+                    .filter(({ d }) => d >= todayStart)
+                    .map(({ i }) => i);
+                
+                if (todayIndices.length > 0) {
+                    const todayFirstIdx = todayIndices[0];
+                    const todayLastIdx = todayIndices[todayIndices.length - 1];
+                    daily = await getTrendWithFallback(pair, hourlyOpens[todayFirstIdx], hourlyCloses[todayLastIdx], 'daily');
+                } else {
+                    // Fallback to daily data if hourly not available for today
+                    daily = await getTrendWithFallback(pair, dailyOpens[lastDailyIdx], dailyCloses[lastDailyIdx], 'daily');
+                }
+            } else {
+                // Fallback to daily data if no hourly data available
+                daily = await getTrendWithFallback(pair, dailyOpens[lastDailyIdx], dailyCloses[lastDailyIdx], 'daily');
+            }
+
+            // DAILY-1 CALCULATION
+            // First open price of first hour of yesterday compared to the last close price of yesterday last hour
+            let daily1: TrendDirection = 'neutral';
+            if (hourlyOpens && hourlyCloses && hourlyTimestamps) {
+                const hourlyDateObjs: Date[] = (hourlyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
+                const yesterday = getYesterday(now);
+                const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+                const yesterdayEnd = new Date(yesterdayStart);
+                yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
+                
+                const yesterdayIndices = hourlyDateObjs
+                    .map((d, i) => ({ d, i }))
+                    .filter(({ d }) => d >= yesterdayStart && d < yesterdayEnd)
+                    .map(({ i }) => i);
+                
+                if (yesterdayIndices.length > 0) {
+                    const yesterdayFirstIdx = yesterdayIndices[0];
+                    const yesterdayLastIdx = yesterdayIndices[yesterdayIndices.length - 1];
+                    daily1 = await getTrendWithFallback(pair, hourlyOpens[yesterdayFirstIdx], hourlyCloses[yesterdayLastIdx], 'daily-1');
+                } else {
+                    // Fallback to daily data if hourly not available for yesterday
+                    if (lastDailyIdx > 0) {
+                        daily1 = await getTrendWithFallback(pair, dailyOpens[lastDailyIdx - 1], dailyCloses[lastDailyIdx - 1], 'daily-1');
+                    } else {
+                        daily1 = await getTrendWithFallback(pair, null, null, 'daily-1');
+                    }
+                }
+            } else {
+                // Fallback to daily data if no hourly data available
+                if (lastDailyIdx > 0) {
+                    daily1 = await getTrendWithFallback(pair, dailyOpens[lastDailyIdx - 1], dailyCloses[lastDailyIdx - 1], 'daily-1');
+                } else {
+                    daily1 = await getTrendWithFallback(pair, null, null, 'daily-1');
                 }
             }
 
@@ -256,36 +459,19 @@ export async function GET() {
                 category = 'major';
             } else if (
                 [
-                    'EURGBP',
-                    'EURJPY',
-                    'EURCHF',
-                    'EURCAD',
-                    'EURAUD',
-                    'EURNZD',
-                    'GBPJPY',
-                    'GBPCHF',
-                    'GBPCAD',
-                    'GBPAUD',
-                    'GBPNZD',
-                    'AUDCAD',
-                    'AUDCHF',
-                    'AUDJPY',
-                    'AUDNZD',
-                    'CADCHF',
-                    'CADJPY',
-                    'CHFJPY',
-                    'NZDCAD',
-                    'NZDCHF',
-                    'NZDJPY',
+                    'EURGBP', 'EURJPY', 'EURCHF', 'EURCAD', 'EURAUD', 'EURNZD',
+                    'GBPJPY', 'GBPCHF', 'GBPCAD', 'GBPAUD', 'GBPNZD',
+                    'AUDCAD', 'AUDCHF', 'AUDJPY', 'AUDNZD',
+                    'CADCHF', 'CADJPY', 'CHFJPY', 'NZDCAD', 'NZDCHF', 'NZDJPY',
                 ].includes(pair)
             ) {
                 category = 'minor';
             } else if (['BTCUSD'].includes(pair)) {
-                category = 'exotic'; // treat crypto as exotic for now
+                category = 'exotic';
             } else if (['XAUUSD', 'XAGUSD', 'BRENT', 'WTI'].includes(pair)) {
-                category = 'commodity'; // metals and oil as commodity
+                category = 'commodity';
             } else if (['US100', 'US30'].includes(pair)) {
-                category = 'exotic'; // treat index as exotic for now
+                category = 'exotic';
             } else {
                 category = 'exotic';
             }
@@ -304,6 +490,48 @@ export async function GET() {
             });
         } catch (e) {
             console.error(`Error fetching ${pair}:`, e);
+            
+            // Even on error, try to provide fallback data
+            try {
+                const fallbackTrend = await fetchTradingViewTrend(pair);
+                
+                let category: ForexPair['category'] = 'major';
+                if (['EURUSD', 'USDJPY', 'GBPUSD', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD'].includes(pair)) {
+                    category = 'major';
+                } else if (
+                    [
+                        'EURGBP', 'EURJPY', 'EURCHF', 'EURCAD', 'EURAUD', 'EURNZD',
+                        'GBPJPY', 'GBPCHF', 'GBPCAD', 'GBPAUD', 'GBPNZD',
+                        'AUDCAD', 'AUDCHF', 'AUDJPY', 'AUDNZD',
+                        'CADCHF', 'CADJPY', 'CHFJPY', 'NZDCAD', 'NZDCHF', 'NZDJPY',
+                    ].includes(pair)
+                ) {
+                    category = 'minor';
+                } else if (['BTCUSD'].includes(pair)) {
+                    category = 'exotic';
+                } else if (['XAUUSD', 'XAGUSD', 'BRENT', 'WTI'].includes(pair)) {
+                    category = 'commodity';
+                } else if (['US100', 'US30'].includes(pair)) {
+                    category = 'exotic';
+                } else {
+                    category = 'exotic';
+                }
+                
+                results.push({
+                    id: yahooSymbolMap[pair],
+                    pair,
+                    category,
+                    daily: fallbackTrend,
+                    daily1: fallbackTrend,
+                    weekly: fallbackTrend,
+                    monthly: fallbackTrend,
+                    monthly1: fallbackTrend,
+                    alignment: true,
+                    lastUpdated: new Date(),
+                });
+            } catch (fallbackError) {
+                console.error(`Fallback also failed for ${pair}:`, fallbackError);
+            }
         }
     }
 
