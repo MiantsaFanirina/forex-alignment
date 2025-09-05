@@ -7,15 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Wifi, WifiOff, Clock, TrendingUp } from 'lucide-react';
 import { TradingLoader } from '@/components/trading-loader';
+import { useTimezone } from '@/contexts/timezone-context';
+import { processForexDataWithTimezone } from '@/lib/client-timezone-processor';
+import { ForexPair } from '@/types/forex';
 
 export default function Home() {
-  const [data, setData] = useState([]);
+  const { selectedTimezone, isClient } = useTimezone();
+  const [rawData, setRawData] = useState<ForexPair[]>([]);
+  const [processedData, setProcessedData] = useState<ForexPair[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Fetch data from API route
+  // Fetch data from API route (always UTC from server)
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -28,7 +33,7 @@ export default function Home() {
         }
       });
       const json = await res.json();
-      setData(json);
+      setRawData(json);
       setIsConnected(true);
     } catch {
       setIsConnected(false);
@@ -36,6 +41,14 @@ export default function Home() {
     setIsLoading(false);
     setInitialLoading(false);
   };
+
+  // Process raw data with timezone when timezone changes
+  useEffect(() => {
+    if (isClient && rawData.length > 0) {
+      const processed = processForexDataWithTimezone(rawData, selectedTimezone);
+      setProcessedData(processed);
+    }
+  }, [rawData, selectedTimezone, isClient]);
 
   useEffect(() => {
     fetchData();
@@ -45,7 +58,7 @@ export default function Home() {
     if (!autoRefresh || initialLoading) return;
     const interval = setInterval(() => {
       fetchData();
-    }, 300);
+    }, 300000); // 5 minutes
     return () => clearInterval(interval);
   }, [autoRefresh, initialLoading]);
 
@@ -96,7 +109,7 @@ export default function Home() {
           </div>
 
           {/* Market Stats */}
-          <MarketStats data={data} />
+          <MarketStats data={processedData} />
           {/* API Integration Notice */}
           <Card className="mb-6 bg-blue-500/10 border-blue-500/20">
             <CardContent className="p-4">
@@ -107,7 +120,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-semibold text-blue-400 mb-1">Live Forex & Commodities Data</h3>
                   <p className="text-sm text-blue-300/80">
-                    Live data from market APIs.
+                    Live data from market APIs with timezone-aware analysis.
                   </p>
                 </div>
               </div>
@@ -115,7 +128,7 @@ export default function Home() {
           </Card>
           {/* Main Table */}
           <ForexTable
-              data={data}
+              data={processedData}
               onRefresh={handleRefresh}
               isLoading={isLoading}
           />

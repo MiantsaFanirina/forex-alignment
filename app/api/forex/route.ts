@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ForexPair, TrendDirection } from '@/types/forex';
+import { getTimeframeTimestamps } from '@/lib/timezone-utils';
 
 const yahooSymbolMap: Record<string, string> = {
     AUDCAD: 'AUDCAD=X',
@@ -159,8 +160,8 @@ async function fetchTradingViewFallback(symbol: string): Promise<TrendDirection>
     }
 }
 
-// Yahoo Finance backup data fetcher
-async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
+// Yahoo Finance backup data fetcher - timezone-aware version
+async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC'): Promise<TimeframeData> {
     try {
         // Fetch daily data
         const dailyRes = await fetch(
@@ -200,20 +201,16 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
             hourlyTimestamps = hourlyJson.chart?.result?.[0]?.timestamp;
         }
 
+        // Use timezone-aware timestamp calculations
+        const timestamps = getTimeframeTimestamps(timezone);
         const lastDailyIdx = dailyOpens.length - 1;
-        const now = new Date();
         const dateObjs: Date[] = (dailyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
         
         // MONTHLY-1: first open of last month vs last close of last month
         let monthly1: TrendDirection = 'neutral';
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        
         const prevMonthIndices = dateObjs
             .map((d, i) => ({ d, i }))
-            .filter(({ d }) => d.getMonth() === prevMonth && d.getFullYear() === prevYear)
+            .filter(({ d }) => d >= timestamps.prevMonthStart && d < timestamps.prevMonthEnd)
             .map(({ i }) => i);
         
         if (prevMonthIndices.length > 0) {
@@ -224,11 +221,11 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
             }
         }
 
-        // MONTHLY: first open of current month vs last close of today
+        // MONTHLY: first open of current month vs last close
         let monthly: TrendDirection = 'neutral';
         const currentMonthIndices = dateObjs
             .map((d, i) => ({ d, i }))
-            .filter(({ d }) => d.getMonth() === currentMonth && d.getFullYear() === currentYear)
+            .filter(({ d }) => d >= timestamps.monthStart)
             .map(({ i }) => i);
         
         if (currentMonthIndices.length > 0) {
@@ -238,17 +235,11 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
             }
         }
 
-        // WEEKLY: first open of current week vs last close of today
+        // WEEKLY: first open of current week vs last close
         let weekly: TrendDirection = 'neutral';
-        const startOfWeek = new Date(now);
-        const day = startOfWeek.getDay();
-        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-        startOfWeek.setDate(diff);
-        startOfWeek.setHours(0, 0, 0, 0);
-        
         const weeklyIndices = dateObjs
             .map((d, i) => ({ d, i }))
-            .filter(({ d }) => d >= startOfWeek)
+            .filter(({ d }) => d >= timestamps.weekStart)
             .map(({ i }) => i);
         
         if (weeklyIndices.length > 0) {
@@ -257,6 +248,7 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
                 weekly = calculateTrend(dailyOpens[weeklyOpenIdx], dailyCloses[lastDailyIdx]);
             }
         } else {
+            // Fallback to last 5 days
             const fallbackWeeklyOpenIdx = Math.max(0, lastDailyIdx - 4);
             if (dailyOpens[fallbackWeeklyOpenIdx] && dailyCloses[lastDailyIdx]) {
                 weekly = calculateTrend(dailyOpens[fallbackWeeklyOpenIdx], dailyCloses[lastDailyIdx]);
@@ -267,10 +259,9 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
         let daily: TrendDirection = 'neutral';
         if (hourlyOpens && hourlyCloses && hourlyTimestamps) {
             const hourlyDateObjs: Date[] = (hourlyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const todayIndices = hourlyDateObjs
                 .map((d, i) => ({ d, i }))
-                .filter(({ d }) => d >= todayStart)
+                .filter(({ d }) => d >= timestamps.todayStart)
                 .map(({ i }) => i);
             
             if (todayIndices.length > 0) {
@@ -290,15 +281,9 @@ async function fetchYahooFinanceData(symbol: string): Promise<TimeframeData> {
         let daily1: TrendDirection = 'neutral';
         if (hourlyOpens && hourlyCloses && hourlyTimestamps) {
             const hourlyDateObjs: Date[] = (hourlyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-            const yesterdayEnd = new Date(yesterdayStart);
-            yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
-            
             const yesterdayIndices = hourlyDateObjs
                 .map((d, i) => ({ d, i }))
-                .filter(({ d }) => d >= yesterdayStart && d < yesterdayEnd)
+                .filter(({ d }) => d >= timestamps.yesterdayStart && d < timestamps.yesterdayEnd)
                 .map(({ i }) => i);
             
             if (yesterdayIndices.length > 0) {
@@ -358,23 +343,28 @@ interface CacheEntry {
 const cache: { [key: string]: CacheEntry } = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function getCachedData(): ForexPair[] | null {
-    const entry = cache['forex-data'];
+function getCachedData(timezone: string): ForexPair[] | null {
+    const cacheKey = `forex-data-${timezone}`;
+    const entry = cache[cacheKey];
     if (!entry || Date.now() - entry.timestamp > CACHE_TTL) {
         return null;
     }
     return entry.data;
 }
 
-function setCachedData(data: ForexPair[]): void {
-    cache['forex-data'] = {
+function setCachedData(data: ForexPair[], timezone: string): void {
+    const cacheKey = `forex-data-${timezone}`;
+    cache[cacheKey] = {
         data,
         timestamp: Date.now()
     };
 }
 
 export async function GET() {
-    const cachedData = getCachedData();
+    // Default to UTC timezone for static export compatibility
+    const timezone = 'UTC';
+    
+    const cachedData = getCachedData(timezone);
     if (cachedData) {
         return NextResponse.json(cachedData);
     }
@@ -384,7 +374,7 @@ export async function GET() {
     for (const [pair, yahooSymbol] of Object.entries(yahooSymbolMap)) {
         try {
             // Use Yahoo Finance as PRIMARY source with proper timeframe calculations
-            const yahooData = await fetchYahooFinanceData(yahooSymbol);
+            const yahooData = await fetchYahooFinanceData(yahooSymbol, timezone);
             
             // Use TradingView only as fallback when Yahoo returns neutral
             const fallbackTrend = await fetchTradingViewFallback(pair);
@@ -430,6 +420,6 @@ export async function GET() {
         }
     }
     
-    setCachedData(results);
+    setCachedData(results, timezone);
     return NextResponse.json(results);
 }

@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Filter, X } from 'lucide-react';
+import { TimezoneSelector } from './timezone-selector';
+import { useTimezone } from '@/contexts/timezone-context';
+import { formatInTimezone } from '@/lib/timezone-utils';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -129,6 +132,7 @@ interface ForexTableProps {
 }
 
 export function ForexTable({ data, onRefresh, isLoading = false }: ForexTableProps) {
+  const { selectedTimezone, setSelectedTimezone, isClient } = useTimezone();
   const [filter, setFilter] = useState<'all' | 'aligned' | 'major' | 'minor' | 'exotic' | 'commodity'>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [columns, setColumns] = useState<string[]>(TIMEFRAME_COLUMNS.map(c => c.key));
@@ -142,6 +146,8 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
   useEffect(() => {
     setLastUpdated(new Date());
   }, [data]);
+
+  // Note: timezone changes are now handled in parent component via client-side processing
 
   // Alignment logic based on selected columns
   const isAligned = (pair: ForexPair, columns: string[]) => {
@@ -184,11 +190,19 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
           <div>
             <CardTitle className="text-xl font-bold text-white">FX Map</CardTitle>
             <p className="text-sm text-gray-400 mt-1">
-              Last updated: {lastUpdated?.toLocaleTimeString() || '--:--:--'} • {alignedCount}/{data.length} pairs aligned
+              Last updated: {isClient && lastUpdated ? formatInTimezone(lastUpdated, selectedTimezone, 'HH:mm:ss zzz') : '--:--:--'} • {alignedCount}/{data.length} pairs aligned
             </p>
           </div>
-          {/* Filters Button for all devices */}
-          <div className="flex w-full justify-end">
+          {/* Timezone selector and Filters */}
+          <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+            {isClient && (
+              <TimezoneSelector 
+                selectedTimezone={selectedTimezone}
+                onTimezoneChange={setSelectedTimezone}
+                className="mb-2 sm:mb-0"
+              />
+            )}
+            <div className="flex justify-end">
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -270,6 +284,7 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </div>
       </CardHeader>
