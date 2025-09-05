@@ -44,7 +44,11 @@ function calculateTrend(open: number, close: number): TrendDirection {
     return 'neutral';
 }
 
-function getPeriodIndices(timestamps: number[], period: 'month' | 'prevMonth' | 'week') {
+function getPeriodIndices(timestamps: number[] | undefined, period: 'month' | 'prevMonth' | 'week') {
+    if (!Array.isArray(timestamps) || timestamps.length === 0) {
+        return [-1, -1];
+    }
+
     const dates = timestamps.map((ts) => new Date(ts * 1000));
     const lastDate = dates[dates.length - 1];
 
@@ -69,9 +73,8 @@ function getPeriodIndices(timestamps: number[], period: 'month' | 'prevMonth' | 
     }
 
     if (period === 'week') {
-        // rolling last 7 days
         const cutoff = new Date(lastDate);
-        cutoff.setDate(cutoff.getDate() - 6); // last 7 days including today
+        cutoff.setDate(cutoff.getDate() - 6); // last 7 days
 
         const indices = dates
             .map((d, i) => ({ d, i }))
@@ -108,7 +111,7 @@ export async function GET() {
             const closes = candles?.close;
             const timestamps = json.chart?.result?.[0]?.timestamp;
 
-            if (!opens || !closes || !timestamps) continue;
+            if (!opens || !closes || !Array.isArray(timestamps)) continue;
 
             const lastIdx = opens.length - 1;
 
