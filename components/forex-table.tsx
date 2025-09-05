@@ -7,7 +7,7 @@ import { AlignmentIndicator } from './alignment-indicator';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Filter, X } from 'lucide-react';
+import { RefreshCw, Filter, X, Search, Settings, ChevronDown } from 'lucide-react';
 import { TimezoneSelector } from './timezone-selector';
 import { useTimezone } from '@/contexts/timezone-context';
 import { formatInTimezone } from '@/lib/timezone-utils';
@@ -38,32 +38,72 @@ const TIMEFRAME_COLUMNS = [
 ];
 
 function ColumnSelector({ selected, onChange }: { selected: string[]; onChange: (cols: string[]) => void }) {
-  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800" onClick={() => setOpen(true)}>
-          Timeframes
+    <div className="space-y-2">
+      <div className="text-xs text-gray-400 font-medium mb-3">
+        Select visible timeframes ({selected.length}/{TIMEFRAME_COLUMNS.length} selected)
+      </div>
+      
+      <div className="grid grid-cols-1 gap-2">
+        {TIMEFRAME_COLUMNS.map(col => {
+          const isSelected = selected.includes(col.key);
+          
+          return (
+            <button
+              key={col.key}
+              onClick={() => {
+                if (isSelected) {
+                  onChange(selected.filter(k => k !== col.key));
+                } else {
+                  onChange([...selected, col.key]);
+                }
+              }}
+              className={cn(
+                'flex items-center justify-between p-3 rounded-lg border transition-all duration-200 text-sm',
+                isSelected
+                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
+                  : 'bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                  isSelected
+                    ? 'bg-blue-500 border-blue-500'
+                    : 'border-gray-500'
+                )}>
+                  {isSelected && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{col.label}</span>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                {col.key === 'monthly1' && 'M-1'}
+                {col.key === 'monthly' && 'M'}
+                {col.key === 'weekly' && 'W'}
+                {col.key === 'daily1' && 'D-1'}
+                {col.key === 'daily' && 'D'}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      
+      {selected.length < TIMEFRAME_COLUMNS.length && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange(TIMEFRAME_COLUMNS.map(c => c.key))}
+          className="w-full text-xs border-gray-600 text-gray-400 hover:text-gray-200"
+        >
+          Select All Timeframes
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {TIMEFRAME_COLUMNS.map(col => (
-          <DropdownMenuCheckboxItem
-            key={col.key}
-            checked={selected.includes(col.key)}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                onChange([...selected, col.key]);
-              } else {
-                onChange(selected.filter(k => k !== col.key));
-              }
-            }}
-          >
-            {col.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      )}
+    </div>
   );
 }
 
@@ -194,96 +234,174 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
             </p>
           </div>
           {/* Timezone selector and Filters */}
-          <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
-            {isClient && (
-              <TimezoneSelector 
-                selectedTimezone={selectedTimezone}
-                onTimezoneChange={setSelectedTimezone}
-                className="mb-2 sm:mb-0"
-              />
-            )}
-            <div className="flex justify-end">
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full md:max-w-[180px] text-xs h-7 border-gray-700 text-gray-300 hover:bg-gray-800 "
-                >
-                  Filters
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-xs w-full p-4" onOpenAutoFocus={(e) => e.preventDefault()}>
-                <DialogHeader>
-                  <DialogTitle>Filters</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                  <div className="relative mb-2">
-                    <Input
-                      placeholder="Search pair..."
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      className="pr-8"
-                    />
-                    {search && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 focus:outline-none"
-                        tabIndex={0}
-                        aria-label="Clear search"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+          <div className="flex flex-col gap-4 sm:gap-2">
+            {/* Mobile: Stack vertically, Desktop: Side by side */}
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-2 items-stretch sm:items-center">
+              {isClient && (
+                <TimezoneSelector 
+                  selectedTimezone={selectedTimezone}
+                  onTimezoneChange={setSelectedTimezone}
+                  className="flex-1 sm:flex-initial"
+                  isMobile={true}
+                />
+              )}
+              
+              <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-initial sm:min-w-[120px] h-12 sm:h-8 py-3 sm:py-1 text-sm sm:text-xs border-gray-700 text-gray-300 hover:bg-gray-700/50 transition-colors"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    <span>Filters</span>
+                    <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                  </Button>
+                </DialogTrigger>
+              <DialogContent className="sm:max-w-md w-full h-full sm:h-auto mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
+                <div className="bg-gray-800 border-0 sm:border border-gray-700 h-full sm:h-auto sm:rounded-lg shadow-xl flex flex-col">
+                  <DialogHeader className="px-6 py-4 pt-6 sm:pt-4 border-b border-gray-700 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5 text-blue-400" />
+                      <DialogTitle className="text-lg font-semibold text-white">Filter & Search</DialogTitle>
+                    </div>
+                  </DialogHeader>
+                  
+                  <div className="px-6 py-4 pb-6 space-y-6 flex-1 overflow-y-auto overscroll-contain">
+                    {/* Search Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <Search className="h-4 w-4" />
+                        <span>Search Pairs</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          placeholder="Type pair name (e.g., EURUSD)..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          className="pr-10 bg-gray-900/50 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 h-10"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          {search ? (
+                            <button
+                              type="button"
+                              onClick={() => setSearch('')}
+                              className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <Search className="h-4 w-4 text-gray-500" />
+                          )}
+                        </div>
+                      </div>
+                      {search && (
+                        <div className="text-xs text-gray-400">
+                          Searching for: <span className="text-white font-medium">{search}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Category Filters */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <Filter className="h-4 w-4" />
+                        <span>Categories</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => {
+                          const getCategoryInfo = (option: string) => {
+                            switch (option) {
+                              case 'all': return { icon: '🌐', label: 'All Pairs' };
+                              case 'aligned': return { icon: '✨', label: 'Aligned' };
+                              case 'major': return { icon: '💎', label: 'Major' };
+                              case 'minor': return { icon: '⭐', label: 'Minor' };
+                              case 'exotic': return { icon: '🔥', label: 'Exotic' };
+                              case 'commodity': return { icon: '🏆', label: 'Commodity' };
+                              default: return { icon: '📊', label: option };
+                            }
+                          };
+                          
+                          const { icon, label } = getCategoryInfo(filterOption);
+                          
+                          return (
+                            <Button
+                              key={filterOption}
+                              variant={filter === filterOption ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setFilter(filterOption)}
+                              className={cn(
+                                'h-12 text-sm transition-all duration-200 flex flex-col items-center justify-center gap-1',
+                                filter === filterOption
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500 shadow-lg transform scale-105'
+                                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                              )}
+                            >
+                              <span className="text-base">{icon}</span>
+                              <span className="text-xs font-medium">{label}</span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Timeframe Selection */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                        <span>⏰</span>
+                        <span>Timeframes</span>
+                      </div>
+                      <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-600">
+                        <ColumnSelector selected={columns} onChange={setColumns} />
+                      </div>
+                    </div>
+
+                    {/* Filter Summary */}
+                    {(filter !== 'all' || search || columns.length !== TIMEFRAME_COLUMNS.length) && (
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                        <div className="text-sm text-blue-400 font-medium mb-2">Active Filters:</div>
+                        <div className="space-y-1 text-xs text-gray-300">
+                          {filter !== 'all' && (
+                            <div>Category: <span className="text-white font-medium">{filter}</span></div>
+                          )}
+                          {search && (
+                            <div>Search: <span className="text-white font-medium">{search}</span></div>
+                          )}
+                          {columns.length !== TIMEFRAME_COLUMNS.length && (
+                            <div>Timeframes: <span className="text-white font-medium">{columns.length} selected</span></div>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div>
-                    <div className="mb-2 text-xs font-semibold text-gray-400">Category</div>
-                    <div className="flex flex-wrap gap-1">
-                      {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => (
-                        <Button
-                          key={filterOption}
-                          variant={filter === filterOption ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setFilter(filterOption)}
-                          className={cn(
-                            'text-xs h-7',
-                            filter === filterOption
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'border-gray-700 text-gray-300 hover:bg-gray-800'
-                          )}
-                        >
-                          <Filter className="h-3 w-3 mr-1" />
-                          {filterOption === 'all' ? 'All' : filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="mb-2 text-xs font-semibold text-gray-400">Timeframes</div>
-                    <ColumnSelector selected={columns} onChange={setColumns} />
-                  </div>
-                  <DialogFooter>
+
+                  <DialogFooter className="px-6 py-4 pb-6 sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
                     <Button
                       variant="outline"
-                      className="w-full my-2"
+                      className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50"
                       onClick={() => {
                         setSearch('');
                         setFilter('all');
                         setColumns(TIMEFRAME_COLUMNS.map(c => c.key));
                       }}
                     >
-                      Reset Filters
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reset All
                     </Button>
                     <DialogClose asChild>
-                      <Button variant="default" className="w-full mt-2" onClick={() => setModalOpen(false)}>
-                        Apply
+                      <Button 
+                        variant="default" 
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+                        onClick={() => setModalOpen(false)}
+                      >
+                        Apply Filters
                       </Button>
                     </DialogClose>
                   </DialogFooter>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
             </div>
           </div>
         </div>
