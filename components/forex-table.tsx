@@ -258,7 +258,7 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                     <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="sm:max-w-md w-full h-full sm:h-auto mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <DialogContent className="sm:max-w-md w-full h-[100vh] sm:h-auto max-h-[100vh] mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div className="bg-gray-800 border-0 sm:border border-gray-700 h-full sm:h-auto sm:rounded-lg shadow-xl flex flex-col">
                   <DialogHeader className="px-6 py-4 pt-6 sm:pt-4 border-b border-gray-700 flex-shrink-0">
                     <div className="flex items-center gap-2">
@@ -267,7 +267,8 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                     </div>
                   </DialogHeader>
                   
-                  <div className="px-6 py-4 pb-6 space-y-6 flex-1 overflow-y-auto overscroll-contain">
+                  <div className="flex-1 overflow-y-auto min-h-0 max-h-[calc(100vh-200px)] sm:max-h-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="px-6 py-4 pb-8 space-y-6">
                     {/* Search Section */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
@@ -374,9 +375,10 @@ export function ForexTable({ data, onRefresh, isLoading = false }: ForexTablePro
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
 
-                  <DialogFooter className="px-6 py-4 pb-6 sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
+                  <DialogFooter className="px-6 py-4 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
                     <Button
                       variant="outline"
                       className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50"
