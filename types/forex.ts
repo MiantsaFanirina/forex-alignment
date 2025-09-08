@@ -1,7 +1,7 @@
 export interface ForexPair {
   id: string;
   pair: string;
-  category: 'major' | 'minor' | 'exotic' | 'commodity';
+  category: 'major' | 'minor' | 'exotic' | 'commodity' | 'crypto';
   monthly: TrendDirection;
   monthly1: TrendDirection;
   weekly: TrendDirection;

@@ -61,7 +61,7 @@ export default function TablePage() {
         fetchOptions.signal = currentAbortController.signal;
       }
       
-      const res = await fetch(`/api/forex?timezone=${encodeURIComponent(timezone)}`, fetchOptions);
+      const res = await fetch(`https://forex-alignment.vercel.app/api/forex?timezone=${encodeURIComponent(timezone)}`, fetchOptions);
       
       if (res.ok) {
         const json = await res.json();

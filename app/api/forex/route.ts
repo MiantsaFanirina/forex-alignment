@@ -8,6 +8,14 @@ import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+};
+
 // Market hours for different instruments (in UTC)
 const MARKET_HOURS = {
     // Forex: Sunday 22:00 UTC to Friday 22:00 UTC
@@ -508,7 +516,7 @@ function getCategory(pair: string): ForexPair['category'] {
     ].includes(pair)) {
         return 'minor';
     } else if (['BTCUSD'].includes(pair)) {
-        return 'exotic';
+        return 'crypto';
     } else if (['XAUUSD', 'XAGUSD', 'BRENT', 'WTI'].includes(pair)) {
         return 'commodity';
     } else if (['US100', 'US30'].includes(pair)) {
@@ -681,7 +689,7 @@ function logAllPairsWithTrends(results: ForexPair[], timezone: string) {
     let errorPairs = 0;
     
     // Group by category for organized display
-    const categories = ['major', 'minor', 'commodity', 'exotic'] as const;
+    const categories = ['major', 'minor', 'commodity', 'crypto', 'exotic'] as const;
     
     categories.forEach(category => {
         const categoryPairs = results.filter(pair => pair.category === category);
@@ -833,6 +841,14 @@ async function fetchTrendData(pair: string, yahooSymbol: string, tradingViewSymb
     }
 }
 
+// Handle CORS preflight requests
+export async function OPTIONS() {
+    return new NextResponse(null, {
+        status: 200,
+        headers: corsHeaders,
+    });
+}
+
 export async function GET(request: Request) {
     // Extract timezone from query parameters
     const { searchParams } = new URL(request.url);
@@ -846,7 +862,7 @@ export async function GET(request: Request) {
     if (cachedData) {
         // Still show analysis for cached data
         logAllPairsWithTrends(cachedData, timezone);
-        return NextResponse.json(cachedData);
+        return NextResponse.json(cachedData, { headers: corsHeaders });
     }
 
     const results: ForexPair[] = [];
@@ -932,8 +948,8 @@ export async function GET(request: Request) {
     // Sort results by category and pair name for consistent ordering
     results.sort((a, b) => {
         if (a.category !== b.category) {
-            const categoryOrder = { 'major': 1, 'minor': 2, 'commodity': 3, 'exotic': 4 };
-            return (categoryOrder[a.category] || 5) - (categoryOrder[b.category] || 5);
+            const categoryOrder = { 'major': 1, 'minor': 2, 'commodity': 3, 'crypto': 4, 'exotic': 5 };
+            return (categoryOrder[a.category] || 6) - (categoryOrder[b.category] || 6);
         }
         return a.pair.localeCompare(b.pair);
     });
@@ -942,5 +958,5 @@ export async function GET(request: Request) {
     logAllPairsWithTrends(results, timezone);
 
     setCachedData(results, timezone);
-    return NextResponse.json(results);
+    return NextResponse.json(results, { headers: corsHeaders });
 }

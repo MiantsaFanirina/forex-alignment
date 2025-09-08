@@ -31,7 +31,7 @@ export default function Home() {
     try {
       const timezone = isClient ? selectedTimezone : 'UTC';
       
-      const res = await fetch(`/api/forex?timezone=${encodeURIComponent(timezone)}`, {
+      const res = await fetch(`https://forex-alignment.vercel.app/api/forex?timezone=${encodeURIComponent(timezone)}`, {
         method: 'GET',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
