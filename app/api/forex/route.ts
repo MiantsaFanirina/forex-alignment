@@ -588,47 +588,7 @@ function setCachedData(data: ForexPair[], timezone: string): void {
     };
 }
 
-// Production-validated expected trends (100% tested and confirmed)
-type TrendValue = 'bullish' | 'bearish' | 'neutral';
-
-interface ValidatedTrends {
-  daily?: TrendValue;
-  daily1?: TrendValue;
-  weekly?: TrendValue;
-  monthly?: TrendValue;
-  monthly1?: TrendValue;
-}
-
-const VALIDATED_TRENDS: Record<string, ValidatedTrends> = {
-  // Original validated trends
-  AUDCAD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  AUDJPY: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  AUDNZD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  AUDUSD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  EURGBP: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  EURJPY: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  GBPAUD: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bullish' },
-  GBPCAD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  GBPCHF: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bullish' },
-  GBPJPY: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  NZDCAD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  NZDCHF: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bearish' },
-  NZDJPY: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  USDCHF: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bearish' },
-  USDJPY: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  BTCUSD: { daily: 'bullish', daily1: 'bearish', weekly: 'bullish', monthly: 'bullish', monthly1: 'bearish' },
-  BRENT: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bearish' },
-  XAUUSD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  XAGUSD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  US30: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bullish' },
-  
-  // Additional pairs from user request
-  EURUSD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  GBPUSD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' },
-  NZDUSD: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bullish' },
-  CADJPY: { weekly: 'bearish', monthly: 'bearish', monthly1: 'bearish' },
-  GBPNZD: { weekly: 'bullish', monthly: 'bullish', monthly1: 'bullish' }
-};
+// Remove VALIDATED_TRENDS - use only real data calculations
 
 // Logging function to display trading periods in user's timezone
 function logTradingPeriods(timezone: string) {
@@ -679,46 +639,14 @@ function logTradingPeriods(timezone: string) {
     });
 }
 
-// Function to validate trends against expected results
-function validateTrends(pair: string, actualTrends: TimeframeData): boolean {
-    const expected = VALIDATED_TRENDS[pair];
-    if (!expected) {
-        console.log(`⚠️  ${pair}: No expected trends defined (showing real data only)`);
-        return true; // Not an error if no validation data exists
-    }
-    
-    let hasErrors = false;
-    const errors: string[] = [];
-    
-    // Check each timeframe that has expected values
-    const timeframes: (keyof TimeframeData)[] = ['daily', 'daily1', 'weekly', 'monthly', 'monthly1'];
-    
-    timeframes.forEach(tf => {
-        if (expected[tf] && expected[tf] !== actualTrends[tf]) {
-            hasErrors = true;
-            errors.push(`${tf.toUpperCase()}: expected ${expected[tf]}, got ${actualTrends[tf]}`);
-        }
-    });
-    
-    if (hasErrors) {
-        console.log(`🚨 ${pair} UNEXPECTED VALIDATION ERROR (should be 100% match):`);
-        errors.forEach(error => console.log(`   - ${error}`));
-        console.log(`   - This indicates a data processing bug that needs fixing!`);
-    } else {
-        console.log(`✅ ${pair}: Perfect match (100% validated)`);
-    }
-    
-    return !hasErrors;
-}
+// Removed validateTrends function - using only real data calculations
 
 // Function to log all pairs with their trends
 function logAllPairsWithTrends(results: ForexPair[], timezone: string) {
-    console.log('\n📊 ALL PAIRS TREND ANALYSIS');
-    console.log('═══════════════════════════════════════════════════');
+    console.log('\n📆 ALL PAIRS TREND ANALYSIS');
+    console.log('═'.repeat(51));
     
     let totalPairs = 0;
-    let validatedPairs = 0;
-    let errorPairs = 0;
     
     // Group by category for organized display
     const categories = ['major', 'minor', 'commodity', 'crypto', 'exotic'] as const;
@@ -754,29 +682,14 @@ function logAllPairsWithTrends(results: ForexPair[], timezone: string) {
             
             console.log(`${alignmentIcon} ${marketStatus} ${pairData.pair.padEnd(8)} ${trendDisplay}`);
             
-            // Validate against expected trends
-            const isValid = validateTrends(pairData.pair, trends);
-            if (VALIDATED_TRENDS[pairData.pair]) {
-                validatedPairs++;
-                if (!isValid) {
-                    errorPairs++;
-                }
-            }
+            // No more validation against expected trends - using real data only
         });
     });
     
     console.log('\n📈 SUMMARY:');
     console.log('─'.repeat(30));
     console.log(`Total Pairs: ${totalPairs}`);
-    console.log(`Pairs with Expected Trends: ${validatedPairs}`);
-    console.log(`Validation Errors: ${errorPairs}`);
-    const successRate = validatedPairs > 0 ? ((validatedPairs - errorPairs) / validatedPairs * 100).toFixed(1) : 0;
-    console.log(`Success Rate: ${successRate}% ${errorPairs === 0 ? '✅ PERFECT!' : '🚨 NEEDS FIXING'}`);
-    
-    if (errorPairs > 0) {
-        console.log(`\n🚀 EXPECTED: 100% match rate with validated trends`);
-        console.log(`🔧 ACTION: Fix data processing bugs causing ${errorPairs} validation errors`);
-    }
+    console.log('Using real-time data from TradingView and Yahoo Finance');
     
     console.log('\n🔑 LEGEND:');
     console.log('─────────────');
@@ -785,10 +698,8 @@ function logAllPairsWithTrends(results: ForexPair[], timezone: string) {
     console.log('D=Daily, D1=Daily-1, W=Weekly, M=Monthly, M1=Monthly-1');
 }
 
-// Main function to fetch trend data - use real data calculations
+// Main function to fetch trend data - use real data calculations only
 async function fetchTrendData(pair: string, yahooSymbol: string, tradingViewSymbol: string, timezone: string, assetType: AssetType): Promise<TimeframeData> {
-    const validatedTrends = VALIDATED_TRENDS[pair];
-    
     try {
         // Always use real data calculations for accurate trends
         const currentTrend = await fetchTradingViewTrend(tradingViewSymbol, timezone, pair);
@@ -802,22 +713,7 @@ async function fetchTrendData(pair: string, yahooSymbol: string, tradingViewSymb
             monthly1: yahooData.monthly1
         };
         
-        // Log validation comparison if we have expected values
-        if (validatedTrends) {
-            let hasDiscrepancy = false;
-            Object.keys(realData).forEach(tf => {
-                if (validatedTrends[tf as keyof ValidatedTrends] && 
-                    validatedTrends[tf as keyof ValidatedTrends] !== realData[tf as keyof TimeframeData]) {
-                    hasDiscrepancy = true;
-                }
-            });
-            
-            if (hasDiscrepancy) {
-                console.log(`🔍 ${pair} - Real vs Expected data comparison:`);
-                console.log(`   Real:     D=${realData.daily} D1=${realData.daily1} W=${realData.weekly} M=${realData.monthly} M1=${realData.monthly1}`);
-                console.log(`   Expected: D=${validatedTrends.daily || 'N/A'} D1=${validatedTrends.daily1 || 'N/A'} W=${validatedTrends.weekly || 'N/A'} M=${validatedTrends.monthly || 'N/A'} M1=${validatedTrends.monthly1 || 'N/A'}`);
-            }
-        }
+        console.log(`📈 ${pair}: D=${realData.daily} D1=${realData.daily1} W=${realData.weekly} M=${realData.monthly} M1=${realData.monthly1}`);
         
         // Return real calculated data
         return realData;
@@ -912,17 +808,16 @@ export async function GET(request: Request) {
         } catch (error) {
             console.error(`Error processing ${pair}:`, error instanceof Error ? error.message : String(error));
             
-            // Fallback with validated trends or neutral
-            const validatedTrends = VALIDATED_TRENDS[pair];
+            // Fallback with neutral values when processing fails
             return {
                 id: yahooSymbol,
                 pair,
                 category: getCategory(pair),
-                daily: validatedTrends?.daily || 'neutral',
-                daily1: validatedTrends?.daily1 || 'neutral',
-                weekly: validatedTrends?.weekly || 'neutral',
-                monthly: validatedTrends?.monthly || 'neutral',
-                monthly1: validatedTrends?.monthly1 || 'neutral',
+                daily: 'neutral',
+                daily1: 'neutral',
+                weekly: 'neutral',
+                monthly: 'neutral',
+                monthly1: 'neutral',
                 alignment: false,
                 lastUpdated: new Date(),
                 marketOpen: isMarketOpen(pair),
