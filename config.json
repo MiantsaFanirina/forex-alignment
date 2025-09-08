@@ -1,0 +1,41 @@
+{
+    "symbols": [
+        "EURUSD=X",
+        "GBPUSD=X", 
+        "USDJPY=X",
+        "AUDUSD=X",
+        "USDCAD=X",
+        "SPY",
+        "QQQ",
+        "AAPL",
+        "MSFT",
+        "TSLA"
+    ],
+    "timeframes": [
+        "1m",
+        "5m", 
+        "15m",
+        "1h",
+        "1d"
+    ],
+    "timezones": [
+        "UTC",
+        "US/Eastern",
+        "US/Central",
+        "US/Pacific",
+        "Europe/London",
+        "Europe/Berlin",
+        "Asia/Tokyo",
+        "Asia/Hong_Kong",
+        "Australia/Sydney"
+    ],
+    "yahoo_delay_seconds": 1,
+    "tradingview_delay_seconds": 2,
+    "max_workers": 3,
+    "selenium_timeout": 30,
+    "chrome_headless": true,
+    "output_directory": "reports",
+    "log_level": "INFO",
+    "comparison_threshold_seconds": 60,
+    "significant_discrepancy_threshold_seconds": 300
+}

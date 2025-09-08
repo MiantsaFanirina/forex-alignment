@@ -76,8 +76,13 @@
   * {
     @apply border-border;
   }
-  body {
+  html, body {
+    height: 100%;
     @apply bg-background text-foreground;
+  }
+  body {
+    margin: 0;
+    padding: 0;
   }
 }
 
@@ -96,3 +101,27 @@
     padding-right: env(safe-area-inset-right);
   }
 }
+
+/* Mobile Landscape Support for Table Headers */
+/* Target mobile devices in landscape mode (height < 600px and aspect ratio > 1) */
+@media screen and (max-height: 600px) and (orientation: landscape) {
+  .mobile-landscape-hidden {
+    display: none !important;
+  }
+  .mobile-landscape-block {
+    display: block !important;
+  }
+}
+
+/* Alternative approach: Target specific width ranges in landscape */
+@media screen and (max-height: 500px) and (min-width: 640px) and (max-width: 1024px) {
+  .mobile-landscape-hidden {
+    display: none !important;
+  }
+  .mobile-landscape-block {
+    display: block !important;
+  }
+}
+
+
+

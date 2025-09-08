@@ -1,37 +1,33 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ForexTable } from '@/components/forex-table';
 import { MarketStats } from '@/components/market-stats';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wifi, WifiOff, Clock, TrendingUp, RefreshCw } from 'lucide-react';
+import { Wifi, TrendingUp, ArrowRight } from 'lucide-react';
 import { TradingLoader } from '@/components/trading-loader';
 import { useTimezone } from '@/contexts/timezone-context';
 import { ForexPair } from '@/types/forex';
+import Link from 'next/link';
 
 export default function Home() {
   const { selectedTimezone, isClient } = useTimezone();
   const [rawData, setRawData] = useState<ForexPair[]>([]);
   const [processedData, setProcessedData] = useState<ForexPair[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isTimezoneLoading, setIsTimezoneLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  // Fetch data from API route with timezone-specific candlestick calculations
-  const fetchData = async (isTimezoneChange: boolean = false) => {
-    // Only show main loading for initial load or timezone changes
-    if (initialLoading || isTimezoneChange) {
-      setIsLoading(true);
+  // Fetch data from API route for market stats
+  const fetchData = async () => {
+    // Cancel any existing request
+    if (abortController) {
+      abortController.abort();
     }
-    
-    // Always show timezone loading indicator for timezone changes
-    if (isTimezoneChange) {
-      setIsTimezoneLoading(true);
-    }
-    
+
+    // Create new abort controller for this request
+    const newAbortController = new AbortController();
+    setAbortController(newAbortController);
+
     try {
       const timezone = isClient ? selectedTimezone : 'UTC';
       
@@ -41,24 +37,24 @@ export default function Home() {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        }
+        },
+        signal: newAbortController.signal
       });
-      const json = await res.json();
-      setRawData(json);
-      setIsConnected(true);
+
+      if (res.ok) {
+        const json = await res.json();
+        setRawData(json);
+      }
     } catch (error) {
-      setIsConnected(false);
-    }
-    
-    if (initialLoading || isTimezoneChange) {
-      setIsLoading(false);
-    }
-    
-    if (isTimezoneChange) {
-      setIsTimezoneLoading(false);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Request was cancelled due to timezone change');
+      } else {
+        console.error('Failed to fetch data:', error);
+      }
     }
     
     setInitialLoading(false);
+    setAbortController(null);
   };
 
   // Since we now get timezone-specific data from API, we use data directly
@@ -73,73 +69,33 @@ export default function Home() {
     fetchData();
   }, []);
 
-  // Refetch data when timezone changes since candlestick boundaries are different
+  // Refetch data when timezone changes
   useEffect(() => {
     if (isClient && !initialLoading) {
-      fetchData(true); // Pass true to indicate this is a timezone change
+      fetchData();
     }
   }, [selectedTimezone, isClient]);
 
+  // Cleanup: Cancel any pending requests when component unmounts
   useEffect(() => {
-    if (!autoRefresh || initialLoading) return;
-    const interval = setInterval(() => {
-      fetchData(false); // Pass false for background auto-refresh
-    }, 1000); 
-    return () => clearInterval(interval);
-  }, [autoRefresh, initialLoading, selectedTimezone, isClient]);
-
-  const handleRefresh = () => fetchData(false); // Manual refresh doesn't need loading overlay
-  const toggleAutoRefresh = () => setAutoRefresh(!autoRefresh);
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, []);
 
   if (initialLoading) {
     return <TradingLoader />;
   }
 
   return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black">
-        <div className="container mx-auto p-4 max-w-7xl">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4">
-              <div className="px-3 sm:px-0">
-                <h1 className="md:text-2xl text-xl font-bold text-white flex md:justify-start justify-center items-center gap-2 my-8">
-                  <TrendingUp className="h-8 w-8 text-blue-500 md:mr-6 mr-2" />
-                  Professional Forex Timeframe Alignment Analysis
-                </h1>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm">
-                  {isConnected ? (
-                      <div className="flex items-center gap-1 text-green-400">
-                        <Wifi className="h-4 w-4" />
-                        <span>Live</span>
-                      </div>
-                  ) : (
-                      <div className="flex items-center gap-1 text-red-400">
-                        <WifiOff className="h-4 w-4" />
-                        <span>Offline</span>
-                      </div>
-                  )}
-                </div>
-                <Button
-                    onClick={toggleAutoRefresh}
-                    variant="outline"
-                    size="sm"
-                    className="bg-black text-white hover:bg-gray-900 border-gray-700 h-7 px-2 text-xs"
-                >
-                  {isTimezoneLoading ? (
-                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                  ) : (
-                    <Clock className="h-3 w-3 mr-1" />
-                  )}
-                  Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-                </Button>
-              </div>
-            </div>
-          </div>
+      <div className="h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="container flex flex-col justify-center h-full mx-auto p-4 max-w-7xl">
 
           {/* Market Stats */}
           <MarketStats data={processedData} />
+          
           {/* API Integration Notice */}
           <Card className="mb-6 bg-blue-500/10 border-blue-500/20">
             <CardContent className="p-4">
@@ -156,16 +112,30 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
-          {/* Main Table */}
-          <ForexTable
-              data={processedData}
-              onRefresh={handleRefresh}
-              isLoading={isLoading}
-              isTimezoneLoading={isTimezoneLoading}
-          />
+          
+          {/* Call to Action for Table */}
+          <Card className="mb-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
+            <CardContent className="p-6 py-12">
+              <div className="text-center space-y-4">
+                <h3 className="text-xl font-semibold text-white mb-2">View Detailed Analysis</h3>
+                <p className="text-gray-300 mb-4">
+                  Access the complete forex alignment table with live data, filtering options, and timezone controls.
+                </p>
+                <Link href="/table">
+                  <Button
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-medium mt-8"
+                  >
+                    Click to open Forex Map
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Footer */}
-          <div className="mt-8 text-center text-sm text-gray-500">
+          <div className="mt-8 text-center text-xs text-gray-500">
             <p>© 2025 Miantsa Fanirina. Professional Forex Analysis Tool.</p>
           </div>
         </div>

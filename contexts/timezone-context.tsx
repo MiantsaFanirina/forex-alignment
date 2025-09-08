@@ -25,7 +25,12 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
     // Load saved timezone from localStorage
     const savedTimezone = localStorage.getItem('forex-selected-timezone');
     if (savedTimezone) {
-      setSelectedTimezone(savedTimezone);
+      // Migrate old invalid timezone identifier
+      const migratedTimezone = savedTimezone === 'Europe/Frankfurt' ? 'Europe/Berlin' : savedTimezone;
+      if (migratedTimezone !== savedTimezone) {
+        localStorage.setItem('forex-selected-timezone', migratedTimezone);
+      }
+      setSelectedTimezone(migratedTimezone);
     } else {
       // Try to detect user's timezone as fallback
       try {
@@ -37,7 +42,7 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
           'Europe/London',
           'Asia/Tokyo',
           'Australia/Sydney',
-          'Europe/Frankfurt',
+          'Europe/Berlin',
           'Asia/Hong_Kong',
           'Asia/Singapore'
         ];

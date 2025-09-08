@@ -1,5 +1,6 @@
 import { format, startOfDay, startOfWeek, startOfMonth, subDays, subMonths } from 'date-fns';
 import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
+import { getTradingPeriods, getTimeframeTimestamps as getTradingPeriodsTimestamps, isSundayInTimezone as isSundayInTradingPeriods, type TimeframeTimestamps as TradingPeriodsTimestamps } from './trading-periods';
 
 export interface TimezoneInfo {
   value: string;
@@ -13,7 +14,7 @@ export const TRADING_TIMEZONES: TimezoneInfo[] = [
   { value: 'Europe/London', label: 'London (Greenwich)', abbreviation: 'GMT/BST' },
   { value: 'Asia/Tokyo', label: 'Tokyo (Japan)', abbreviation: 'JST' },
   { value: 'Australia/Sydney', label: 'Sydney (Australian Eastern)', abbreviation: 'AEST/AEDT' },
-  { value: 'Europe/Frankfurt', label: 'Frankfurt (Central European)', abbreviation: 'CET/CEST' },
+  { value: 'Europe/Berlin', label: 'Frankfurt (Central European)', abbreviation: 'CET/CEST' },
   { value: 'Asia/Hong_Kong', label: 'Hong Kong', abbreviation: 'HKT' },
   { value: 'Asia/Singapore', label: 'Singapore', abbreviation: 'SGT' }
 ];
@@ -23,44 +24,11 @@ export const DEFAULT_TIMEZONE = 'UTC';
 /**
  * Get timezone-adjusted timestamps for timeframe calculations
  */
-export interface TimeframeTimestamps {
-  now: Date;
-  todayStart: Date;
-  yesterdayStart: Date;
-  yesterdayEnd: Date;
-  weekStart: Date;
-  monthStart: Date;
-  prevMonthStart: Date;
-  prevMonthEnd: Date;
-}
+export type TimeframeTimestamps = TradingPeriodsTimestamps;
 
-export function getTimeframeTimestamps(timezone: string = DEFAULT_TIMEZONE): TimeframeTimestamps {
-  const nowUtc = new Date();
-  const nowInTimezone = toZonedTime(nowUtc, timezone);
-  
-  // Get start of periods in the target timezone
-  const todayStartInTimezone = startOfDay(nowInTimezone);
-  const yesterdayInTimezone = subDays(nowInTimezone, 1);
-  const yesterdayStartInTimezone = startOfDay(yesterdayInTimezone);
-  
-  // Week starts on Monday
-  const weekStartInTimezone = startOfWeek(nowInTimezone, { weekStartsOn: 1 });
-  
-  const monthStartInTimezone = startOfMonth(nowInTimezone);
-  const prevMonthDate = subMonths(nowInTimezone, 1);
-  const prevMonthStartInTimezone = startOfMonth(prevMonthDate);
-  
-  // Convert back to UTC for consistent API usage
-  return {
-    now: fromZonedTime(nowInTimezone, timezone),
-    todayStart: fromZonedTime(todayStartInTimezone, timezone),
-    yesterdayStart: fromZonedTime(yesterdayStartInTimezone, timezone),
-    yesterdayEnd: fromZonedTime(startOfDay(nowInTimezone), timezone), // Today start = yesterday end
-    weekStart: fromZonedTime(weekStartInTimezone, timezone),
-    monthStart: fromZonedTime(monthStartInTimezone, timezone),
-    prevMonthStart: fromZonedTime(prevMonthStartInTimezone, timezone),
-    prevMonthEnd: fromZonedTime(monthStartInTimezone, timezone), // Current month start = prev month end
-  };
+export function getTimeframeTimestamps(timezone: string = DEFAULT_TIMEZONE, currencyOrPair: string = 'EURUSD'): TimeframeTimestamps {
+  // Use the new trading periods utility for UTC-consistent calculations
+  return getTradingPeriodsTimestamps(timezone, currencyOrPair);
 }
 
 /**
@@ -123,22 +91,96 @@ export function isDateInTimeframe(
 }
 
 /**
- * Get current market session based on timezone
+ * Check if a given date/time represents a valid forex trading session
+ * Forex markets are typically open from Sunday 22:00 UTC to Friday 22:00 UTC
+ */
+export function isValidTradingSession(date: Date): boolean {
+  const utcDay = date.getUTCDay();
+  const utcHour = date.getUTCHours();
+  
+  // Saturday is always closed
+  if (utcDay === 6) {
+    return false;
+  }
+  
+  // Sunday opens at 22:00 UTC
+  if (utcDay === 0 && utcHour < 22) {
+    return false;
+  }
+  
+  // Friday closes at 22:00 UTC
+  if (utcDay === 5 && utcHour >= 22) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Check if yesterday was a valid trading day
+ * Returns true if yesterday had trading sessions, false for weekends/holidays
+ */
+export function wasYesterdayTradingDay(timezone: string = DEFAULT_TIMEZONE): boolean {
+  const timestamps = getTimeframeTimestamps(timezone);
+  return isValidTradingSession(timestamps.yesterdayStart);
+}
+
+/**
+ * Get current date and time in the user's selected timezone
+ */
+export function getCurrentInTimezone(timezone: string = DEFAULT_TIMEZONE): {
+  date: Date;
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  hour: number;
+  minute: number;
+} {
+  const nowUtc = new Date();
+  const nowInTimezone = toZonedTime(nowUtc, timezone);
+  
+  return {
+    date: nowInTimezone,
+    dayOfWeek: nowInTimezone.getDay(),
+    hour: nowInTimezone.getHours(),
+    minute: nowInTimezone.getMinutes()
+  };
+}
+
+/**
+ * Check if it's Sunday in the user's timezone
+ */
+export function isSundayInTimezone(timezone: string = DEFAULT_TIMEZONE): boolean {
+  // Use the new trading periods utility for consistent timezone handling
+  return isSundayInTradingPeriods(timezone);
+}
+
+/**
+ * Get current market session based on timezone (improved forex market hours)
  */
 export function getCurrentMarketSession(timezone: string = DEFAULT_TIMEZONE): string {
-  const nowInTimezone = toZonedTime(new Date(), timezone);
-  const hour = nowInTimezone.getHours();
+  const now = new Date();
   
-  // Define trading sessions (24-hour format)
-  if (timezone.includes('New_York') || timezone.includes('America')) {
-    if (hour >= 9 && hour < 16) return 'NY Session';
-  } else if (timezone.includes('London') || timezone.includes('Europe')) {
-    if (hour >= 8 && hour < 16) return 'London Session';
-  } else if (timezone.includes('Tokyo') || timezone.includes('Asia')) {
-    if (hour >= 9 && hour < 15) return 'Tokyo Session';
-  } else if (timezone.includes('Sydney') || timezone.includes('Australia')) {
-    if (hour >= 9 && hour < 17) return 'Sydney Session';
+  if (!isValidTradingSession(now)) {
+    return 'Off Hours';
+  }
+  
+  const utcHour = now.getUTCHours();
+  
+  // Forex trading sessions in UTC
+  if (utcHour >= 22 || utcHour < 8) {
+    return 'Sydney/Tokyo Session';
+  } else if (utcHour >= 8 && utcHour < 15) {
+    return 'London Session';
+  } else if (utcHour >= 13 && utcHour < 22) {
+    return 'NY Session';
   }
   
   return 'Off Hours';
+}
+
+/**
+ * Get comprehensive trading periods for a currency pair
+ * Uses the new UTC-consistent trading periods utility
+ */
+export function getCurrencyTradingPeriods(currencyOrPair: string, inputDate?: Date | string | null) {
+  return getTradingPeriods(currencyOrPair, inputDate);
 }

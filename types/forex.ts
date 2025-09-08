@@ -9,6 +9,7 @@ export interface ForexPair {
   daily: TrendDirection;
   alignment: boolean;
   lastUpdated: Date;
+  marketOpen?: boolean; // Optional for backward compatibility
 }
 
 export type TrendDirection = 'bullish' | 'bearish' | 'neutral';

@@ -1,0 +1,34 @@
+# Market Data Comparison Script Requirements
+# Core dependencies for market data retrieval and comparison
+
+# Data manipulation and analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Market data sources
+yfinance>=0.2.18
+
+# Web scraping for TradingView
+selenium>=4.15.0
+requests>=2.31.0
+
+# Timezone handling
+pytz>=2023.3
+
+# Async operations (if needed for future enhancements)
+aiohttp>=3.8.0
+
+# ChromeDriver management (optional, but helpful)
+webdriver-manager>=4.0.0
+
+# Additional utilities
+python-dateutil>=2.8.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Development and testing (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Logging enhancements (optional)
+colorlog>=6.7.0
