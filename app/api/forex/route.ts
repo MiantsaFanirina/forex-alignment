@@ -487,19 +487,13 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
             );
         }
 
-        // MONDAY ALIGNMENT FIX: On Monday, if daily and weekly start from same day but show different trends,
-        // it's likely due to missing data. Ensure they align.
+        // MONDAY ALIGNMENT FIX: On Monday, Daily and Weekly should be identical
+        // Both represent "from Monday morning to now" since we're on Monday
         const currentDay = new Date().getUTCDay(); // 0=Sunday, 1=Monday, etc.
         if (currentDay === 1) { // Monday
-            const dailyStart = tradingPeriods.periods.daily.start;
-            const weeklyStart = tradingPeriods.periods.weekly.start;
-            
-            // Check if daily and weekly start from the same day (should be true on Monday)
-            const sameStartDay = dailyStart.toISOString().slice(0,10) === weeklyStart.toISOString().slice(0,10);
-            
-            if (sameStartDay && trends.daily !== 'neutral' && trends.weekly !== 'neutral' && trends.daily !== trends.weekly) {
-                console.log(`🔧 ${pair} MONDAY ALIGNMENT: Daily=${trends.daily}, Weekly=${trends.weekly} -> Aligning to Daily trend`);
-                trends.weekly = trends.daily; // Use daily trend for weekly on Monday when they should be the same
+            if (trends.daily !== trends.weekly) {
+                console.log(`🔧 ${pair} MONDAY ALIGNMENT: Daily=${trends.daily}, Weekly=${trends.weekly} -> Using Daily for both`);
+                trends.weekly = trends.daily; // Force alignment on Monday
             }
         }
 
