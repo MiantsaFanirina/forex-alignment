@@ -205,7 +205,8 @@ async function fetchTradingViewTrend(symbol: string, timezone: string = 'UTC', p
         () => fetchYahooFinanceDailyTrend(yahooSymbolMap[pair!] || symbol, timezone, pair!)
     ];
 
-    for (const [index, strategy] of strategies.entries()) {
+    for (let index = 0; index < strategies.length; index++) {
+        const strategy = strategies[index];
         try {
             const result = await strategy();
             if (result !== 'neutral') {
@@ -675,7 +676,7 @@ async function fetchYahooFinanceDataTimezoneAware(symbol: string, timezone: stri
         }
         
         // MONTHLY: Current month
-        const monthlyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.monthly.start, null, 'MONTHLY');
+        const monthlyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.monthly.start, undefined, 'MONTHLY');
         if (monthlyIndices.openIdx >= 0 && monthlyIndices.closeIdx >= 0 &&
             dailyOpens[monthlyIndices.openIdx] && dailyCloses[monthlyIndices.closeIdx]) {
             trends.monthly = calculateTrend(
@@ -685,7 +686,7 @@ async function fetchYahooFinanceDataTimezoneAware(symbol: string, timezone: stri
         }
         
         // WEEKLY: Current week
-        const weeklyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.weekly.start, null, 'WEEKLY');
+        const weeklyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.weekly.start, undefined, 'WEEKLY');
         if (weeklyIndices.openIdx >= 0 && weeklyIndices.closeIdx >= 0 &&
             dailyOpens[weeklyIndices.openIdx] && dailyCloses[weeklyIndices.closeIdx]) {
             trends.weekly = calculateTrend(
@@ -695,7 +696,7 @@ async function fetchYahooFinanceDataTimezoneAware(symbol: string, timezone: stri
         }
         
         // DAILY: Today
-        const dailyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.daily.start, null, 'DAILY');
+        const dailyIndices = findTimezoneAwareDataIndex(tradingPeriods.periods.daily.start, undefined, 'DAILY');
         if (dailyIndices.openIdx >= 0 && dailyIndices.closeIdx >= 0 &&
             dailyOpens[dailyIndices.openIdx] && dailyCloses[dailyIndices.closeIdx]) {
             trends.daily = calculateTrend(
