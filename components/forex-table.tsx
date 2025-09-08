@@ -337,17 +337,17 @@ export function ForexTable({
                       Filters
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md w-full h-[100vh] sm:h-auto max-h-[100vh] mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
-            <div className="bg-gray-800 border-0 sm:border border-gray-700 h-full sm:h-auto sm:rounded-lg shadow-xl flex flex-col">
-              <DialogHeader className="px-6 py-4 pt-6 sm:pt-4 border-b border-gray-700 flex-shrink-0">
+                  <DialogContent className="w-screen h-[100dvh] max-w-none max-h-none translate-x-0 translate-y-0 left-0 top-0 m-0 p-0 rounded-none xl:w-auto xl:h-auto xl:min-w-[500px] xl:max-w-lg xl:max-h-[90vh] xl:left-[50%] xl:top-[50%] xl:translate-x-[-50%] xl:translate-y-[-50%] xl:m-4 xl:rounded-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <div className="bg-gray-800 border-0 xl:border border-gray-700 h-[100dvh] xl:h-auto w-full xl:rounded-lg shadow-xl flex flex-col">
+              <DialogHeader className="px-6 py-4 pr-12 xl:pr-6 border-b border-gray-700">
                 <div className="flex items-center gap-2">
                   <Settings className="h-5 w-5 text-blue-400" />
                   <DialogTitle className="text-lg font-semibold text-white">Filter & Search</DialogTitle>
                 </div>
               </DialogHeader>
                   
-                  <div className="flex-1 overflow-y-auto min-h-0 max-h-[calc(100vh-200px)] sm:max-h-none" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    <div className="px-6 py-4 pb-8 space-y-6">
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <div className="h-full overflow-y-auto px-6 py-4 space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
                     {/* Search Section */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
@@ -456,7 +456,7 @@ export function ForexTable({
                     </div>
                   </div>
 
-                    <DialogFooter className="px-6 py-4 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
+                    <DialogFooter className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] xl:pb-4 border-t border-gray-700 flex flex-col xl:flex-row gap-2 bg-gray-800">
                       <Button
                         variant="outline"
                         className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50"
@@ -551,17 +551,16 @@ export function ForexTable({
                       <Filter className="h-3.5 w-3.5" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md w-full h-[100vh] sm:h-auto max-h-[100vh] mx-0 sm:mx-4 p-0 sm:rounded-lg rounded-none" onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <div className="bg-gray-800 border-0 sm:border border-gray-700 h-full sm:h-auto sm:rounded-lg shadow-xl flex flex-col">
-                    <DialogHeader className="px-6 py-4 pt-6 sm:pt-4 border-b border-gray-700 flex-shrink-0">
+                  <DialogContent className="w-screen h-[100dvh] max-w-none max-h-none translate-x-0 translate-y-0 left-0 top-0 m-0 p-0 rounded-none xl:w-auto xl:h-auto xl:min-w-[500px] xl:max-w-lg xl:max-h-[90vh] xl:left-[50%] xl:top-[50%] xl:translate-x-[-50%] xl:translate-y-[-50%] xl:m-4 xl:rounded-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <div className="bg-gray-800 border-0 xl:border border-gray-700 h-[100dvh] xl:h-auto w-full xl:rounded-lg shadow-xl flex flex-col">
+                    <DialogHeader className="px-6 py-4 pr-12 xl:pr-6 border-b border-gray-700">
                       <div className="flex items-center gap-2">
                         <Settings className="h-5 w-5 text-blue-400" />
                         <DialogTitle className="text-lg font-semibold text-white">Filter & Search</DialogTitle>
                       </div>
                     </DialogHeader>
-                    <div className="flex-1 overflow-y-auto min-h-0 max-h-[calc(100vh-200px)] sm:max-h-none" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="px-6 py-4 pb-8 space-y-6">
-                        {/* Mobile dialog content here - same as desktop */}
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <div className="h-full overflow-y-auto px-6 py-4 space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
                             <Search className="h-4 w-4" />
@@ -668,7 +667,7 @@ export function ForexTable({
                         )}
                       </div>
                     </div>
-                    <DialogFooter className="px-6 py-4 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2 flex-shrink-0 bg-gray-800">
+                    <DialogFooter className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] xl:pb-4 border-t border-gray-700 flex flex-col xl:flex-row gap-2 bg-gray-800">
                       <Button
                         variant="outline"
                         className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50"
