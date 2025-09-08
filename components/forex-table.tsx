@@ -189,7 +189,7 @@ export function ForexTable({
   onToggleAutoRefresh
 }: ForexTableProps) {
   const { selectedTimezone, setSelectedTimezone, isClient } = useTimezone();
-  const [filter, setFilter] = useState<'all' | 'aligned' | 'major' | 'minor' | 'exotic' | 'commodity'>('all');
+  const [filter, setFilter] = useState<'all' | 'aligned' | 'major' | 'minor' | 'exotic' | 'commodity' | 'crypto'>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [columns, setColumns] = useState<string[]>(TIMEFRAME_COLUMNS.map(c => c.key));
   const [modalOpen, setModalOpen] = useState(false);
@@ -237,6 +237,7 @@ export function ForexTable({
       case 'minor': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
       case 'exotic': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'commodity': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'crypto': return 'bg-green-500/20 text-green-400 border-green-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -247,6 +248,7 @@ export function ForexTable({
       case 'minor': return 'bg-purple-400';
       case 'exotic': return 'bg-orange-400';
       case 'commodity': return 'bg-yellow-400';
+      case 'crypto': return 'bg-green-400';
       default: return 'bg-gray-400';
     }
   };
@@ -390,7 +392,7 @@ export function ForexTable({
                         <span>Categories</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => {
+                        {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity', 'crypto'] as const).map((filterOption) => {
                           const getCategoryLabel = (option: string) => {
                             switch (option) {
                               case 'all': return 'All Pairs';
@@ -399,6 +401,7 @@ export function ForexTable({
                               case 'minor': return 'Minor';
                               case 'exotic': return 'Exotic';
                               case 'commodity': return 'Commodity';
+                              case 'crypto': return 'Crypto';
                               default: return option;
                             }
                           };
@@ -602,7 +605,7 @@ export function ForexTable({
                             <span>Categories</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity'] as const).map((filterOption) => {
+                            {(['all', 'aligned', 'major', 'minor', 'exotic', 'commodity', 'crypto'] as const).map((filterOption) => {
                               const getCategoryLabel = (option: string) => {
                                 switch (option) {
                                   case 'all': return 'All Pairs';
@@ -611,6 +614,7 @@ export function ForexTable({
                                   case 'minor': return 'Minor';
                                   case 'exotic': return 'Exotic';
                                   case 'commodity': return 'Commodity';
+                                  case 'crypto': return 'Crypto';
                                   default: return option;
                                 }
                               };
