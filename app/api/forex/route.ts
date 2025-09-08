@@ -753,73 +753,16 @@ function logAllPairsWithTrends(results: ForexPair[], timezone: string) {
     console.log('D=Daily, D1=Daily-1, W=Weekly, M=Monthly, M1=Monthly-1');
 }
 
-// Main function to fetch trend data - prioritize expected trends with real data validation
+// Main function to fetch trend data - use real data calculations
 async function fetchTrendData(pair: string, yahooSymbol: string, tradingViewSymbol: string, timezone: string, assetType: AssetType): Promise<TimeframeData> {
     const validatedTrends = VALIDATED_TRENDS[pair];
     
     try {
-        // For pairs with expected trends, use them as primary source
-        if (validatedTrends) {
-            // Start with expected trends as base
-            const finalData: TimeframeData = {
-                daily: validatedTrends.daily || 'neutral',
-                daily1: validatedTrends.daily1 || 'neutral',
-                weekly: validatedTrends.weekly || 'neutral',
-                monthly: validatedTrends.monthly || 'neutral',
-                monthly1: validatedTrends.monthly1 || 'neutral'
-            };
-            
-            // Only fetch real data for current daily trend if not defined in expected
-            if (!validatedTrends.daily) {
-                try {
-                    const currentTrend = await fetchTradingViewTrend(tradingViewSymbol, timezone, pair);
-                    if (currentTrend !== 'neutral') {
-                        finalData.daily = currentTrend;
-                    }
-                } catch (error) {
-                    console.log(`TradingView fetch failed for ${pair}, keeping expected/neutral`);
-                }
-            }
-            
-            // Validate real data matches expected (for logging purposes)
-            try {
-                const yahooData = await fetchYahooFinanceData(yahooSymbol, timezone, pair);
-                const currentTrend = await fetchTradingViewTrend(tradingViewSymbol, timezone, pair);
-                
-                // Log discrepancies for debugging
-                const realData = {
-                    daily: currentTrend,
-                    daily1: yahooData.daily1,
-                    weekly: yahooData.weekly,
-                    monthly: yahooData.monthly,
-                    monthly1: yahooData.monthly1
-                };
-                
-                let hasDiscrepancy = false;
-                Object.keys(finalData).forEach(tf => {
-                    if (validatedTrends[tf as keyof ValidatedTrends] && 
-                        validatedTrends[tf as keyof ValidatedTrends] !== realData[tf as keyof TimeframeData]) {
-                        hasDiscrepancy = true;
-                    }
-                });
-                
-                if (hasDiscrepancy) {
-                    console.log(`🔍 ${pair} - Real vs Expected data comparison:`);
-                    console.log(`   Real:     D=${realData.daily} D1=${realData.daily1} W=${realData.weekly} M=${realData.monthly} M1=${realData.monthly1}`);
-                    console.log(`   Expected: D=${finalData.daily} D1=${finalData.daily1} W=${finalData.weekly} M=${finalData.monthly} M1=${finalData.monthly1}`);
-                }
-            } catch (validationError) {
-                console.log(`Validation fetch failed for ${pair}, using expected trends only`);
-            }
-            
-            return finalData;
-        }
-        
-        // For pairs without expected trends, use real data
+        // Always use real data calculations for accurate trends
         const currentTrend = await fetchTradingViewTrend(tradingViewSymbol, timezone, pair);
         const yahooData = await fetchYahooFinanceData(yahooSymbol, timezone, pair);
         
-        return {
+        const realData: TimeframeData = {
             daily: currentTrend,
             daily1: yahooData.daily1,
             weekly: yahooData.weekly,
@@ -827,16 +770,36 @@ async function fetchTrendData(pair: string, yahooSymbol: string, tradingViewSymb
             monthly1: yahooData.monthly1
         };
         
+        // Log validation comparison if we have expected values
+        if (validatedTrends) {
+            let hasDiscrepancy = false;
+            Object.keys(realData).forEach(tf => {
+                if (validatedTrends[tf as keyof ValidatedTrends] && 
+                    validatedTrends[tf as keyof ValidatedTrends] !== realData[tf as keyof TimeframeData]) {
+                    hasDiscrepancy = true;
+                }
+            });
+            
+            if (hasDiscrepancy) {
+                console.log(`🔍 ${pair} - Real vs Expected data comparison:`);
+                console.log(`   Real:     D=${realData.daily} D1=${realData.daily1} W=${realData.weekly} M=${realData.monthly} M1=${realData.monthly1}`);
+                console.log(`   Expected: D=${validatedTrends.daily || 'N/A'} D1=${validatedTrends.daily1 || 'N/A'} W=${validatedTrends.weekly || 'N/A'} M=${validatedTrends.monthly || 'N/A'} M1=${validatedTrends.monthly1 || 'N/A'}`);
+            }
+        }
+        
+        // Return real calculated data
+        return realData;
+        
     } catch (error) {
         console.error(`Error in fetchTrendData for ${pair}:`, error instanceof Error ? error.message : String(error));
         
-        // Fallback: use expected trends if available, otherwise neutral
+        // Fallback: neutral for all timeframes if data fetch fails
         return {
-            daily: validatedTrends?.daily || 'neutral',
-            daily1: validatedTrends?.daily1 || 'neutral',
-            weekly: validatedTrends?.weekly || 'neutral',
-            monthly: validatedTrends?.monthly || 'neutral',
-            monthly1: validatedTrends?.monthly1 || 'neutral'
+            daily: 'neutral',
+            daily1: 'neutral',
+            weekly: 'neutral',
+            monthly: 'neutral',
+            monthly1: 'neutral'
         };
     }
 }
