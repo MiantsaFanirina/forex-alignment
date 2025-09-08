@@ -392,7 +392,7 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         const dateObjs: Date[] = (dailyTimestamps as number[]).map((ts: number) => new Date(ts * 1000));
 
         // Helper function to find data point index for a given date range
-        const findDataIndex = (targetStart: Date, targetEnd?: Date): { openIdx: number; closeIdx: number } => {
+        const findDataIndex = (targetStart: Date, targetEnd?: Date, periodName?: string): { openIdx: number; closeIdx: number } => {
             let openIdx = -1;
             let closeIdx = -1;
 
@@ -416,6 +416,13 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
                 closeIdx = lastDailyIdx; // Use latest available data
             }
 
+            // Debug logging for problematic pairs on Monday
+            if (['GBPUSD', 'USDCAD', 'USDJPY', 'GBPJPY', 'NZDCHF'].includes(pair) && periodName) {
+                console.log(`🔍 ${pair} ${periodName}: target=${targetStart.toISOString().slice(0,10)} openIdx=${openIdx} closeIdx=${closeIdx}`);
+                if (openIdx >= 0) console.log(`   openDate=${dateObjs[openIdx].toISOString().slice(0,10)} openPrice=${dailyOpens[openIdx]}`);
+                if (closeIdx >= 0) console.log(`   closeDate=${dateObjs[closeIdx].toISOString().slice(0,10)} closePrice=${dailyCloses[closeIdx]}`);
+            }
+
             return { openIdx, closeIdx };
         };
 
@@ -431,7 +438,8 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         // MONTHLY-1: Previous month (historical period)
         const monthly1Indices = findDataIndex(
             tradingPeriods.periods.monthly1.start,
-            tradingPeriods.periods.monthly1.end
+            tradingPeriods.periods.monthly1.end,
+            'MONTHLY1'
         );
         if (monthly1Indices.openIdx >= 0 && monthly1Indices.closeIdx >= 0 && 
             monthly1Indices.openIdx <= monthly1Indices.closeIdx &&
@@ -443,7 +451,7 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         }
 
         // MONTHLY: Current month
-        const monthlyIndices = findDataIndex(tradingPeriods.periods.monthly.start);
+        const monthlyIndices = findDataIndex(tradingPeriods.periods.monthly.start, undefined, 'MONTHLY');
         if (monthlyIndices.openIdx >= 0 && monthlyIndices.closeIdx >= 0 &&
             dailyOpens[monthlyIndices.openIdx] && dailyCloses[monthlyIndices.closeIdx]) {
             trends.monthly = calculateTrend(
@@ -453,7 +461,7 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         }
 
         // WEEKLY: Current week
-        const weeklyIndices = findDataIndex(tradingPeriods.periods.weekly.start);
+        const weeklyIndices = findDataIndex(tradingPeriods.periods.weekly.start, undefined, 'WEEKLY');
         if (weeklyIndices.openIdx >= 0 && weeklyIndices.closeIdx >= 0 &&
             dailyOpens[weeklyIndices.openIdx] && dailyCloses[weeklyIndices.closeIdx]) {
             trends.weekly = calculateTrend(
@@ -463,7 +471,7 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         }
 
         // DAILY: Today
-        const dailyIndices = findDataIndex(tradingPeriods.periods.daily.start);
+        const dailyIndices = findDataIndex(tradingPeriods.periods.daily.start, undefined, 'DAILY');
         if (dailyIndices.openIdx >= 0 && dailyIndices.closeIdx >= 0 &&
             dailyOpens[dailyIndices.openIdx] && dailyCloses[dailyIndices.closeIdx]) {
             trends.daily = calculateTrend(
@@ -478,7 +486,8 @@ async function fetchYahooFinanceData(symbol: string, timezone: string = 'UTC', p
         } else {
             const daily1Indices = findDataIndex(
                 tradingPeriods.periods.daily1.start,
-                tradingPeriods.periods.daily1.end
+                tradingPeriods.periods.daily1.end,
+                'DAILY1'
             );
             if (daily1Indices.openIdx >= 0 && daily1Indices.closeIdx >= 0 &&
                 daily1Indices.openIdx <= daily1Indices.closeIdx &&
